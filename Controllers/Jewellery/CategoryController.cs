@@ -25,7 +25,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 try
                 {
                     conn.Open();
-                    string query = "SELECT fItemcode,fparent, fItemName, fimage FROM Item11 WHERE LEFT(fParent, 5) = '00001' AND fAclevel = 2";
+                    string query = "SELECT fItemcode,fparent, fItemName, fimage FROM Item WHERE LEFT(fParent, 5) = '00001' AND fAclevel = 2";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     using (SqlDataReader reader = cmd.ExecuteReader())
