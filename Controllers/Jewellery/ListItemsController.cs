@@ -18,24 +18,15 @@ namespace CHITSCHEME.Controllers.Jewellery
 
         //------------------------------------------------All Category List Items   Mixed --------------------
         [HttpGet]
-        [Route("ItemsList/{parent}")]
+        [Route("ItemsList/{itemCode}")]
         public async Task<IActionResult> ItemsList(
-       [FromRoute] string parent,
-       [FromQuery] int pageNumber = 1,
-       [FromQuery] int pageSize = 20,
-       [FromQuery] string searchTerm = "", [FromQuery] string customerCode="")
-        {   
-
-            if (string.IsNullOrWhiteSpace(customerCode))
-            {
-                return BadRequest(new { message = "User Id is required" });
-            }
-
-            if (pageNumber <= 0) pageNumber = 1;
-            if (pageSize <= 0 || pageSize > 100) pageSize = 20;
-
-            List<ListAllItem> itemsList = new List<ListAllItem>();
-            int totalRecords = 0;
+      [FromRoute] string itemCode,
+      [FromQuery] int pageNumber = 1,
+      [FromQuery] int pageSize = 20,
+      [FromQuery] string customerCode = ""
+  )
+        {
+            var ItemsList = new List<object>();
 
             try
             {
@@ -43,122 +34,105 @@ namespace CHITSCHEME.Controllers.Jewellery
                 {
                     await connection.OpenAsync();
 
-                    string baseCondition = "i.fAclevel = -4 AND (i.fparent LIKE @fparent)";
-                    if (!string.IsNullOrWhiteSpace(searchTerm))
-                    {
-                        baseCondition += " AND (i.fItemName LIKE @search OR i.fDesignNo LIKE @search OR i.fItemcode LIKE @search)";
-                    }
-
-                    string countQuery = $@"
-                SELECT COUNT(*) 
-                FROM Item11 i
-                INNER JOIN Division d ON i.fPurity = d.fName
-                WHERE {baseCondition}";
-
-                    using (SqlCommand countCommand = new SqlCommand(countQuery, connection))
-                    {
-                        countCommand.Parameters.AddWithValue("@fparent", parent + "%");
-                        if (!string.IsNullOrWhiteSpace(searchTerm))
-                        {
-                            countCommand.Parameters.AddWithValue("@search", "%" + searchTerm + "%");
-                        }
-
-                        totalRecords = (int)await countCommand.ExecuteScalarAsync();
-                    }
-
-                    string query = $@"
+                    string query = @"
                 SELECT 
-                    i.fItemcode,
-                    i.fparent,
-                    i.fItemName, 
-                    i.fDesignNo, 
-                    CASE WHEN w.fProductCode IS NOT NULL THEN 'Y' ELSE 'N' END AS IsWishlist,
-                    i.fimage, 
-                    i.Weight,
-                    i.NetWt,
-                    i.fVA, 
-                    i.fVAGMS, 
-                    i.fMc, 
-                    i.fOthers, 
-                    i.fTax, 
-                    i.fStoneCharges, 
-                    i.fPieceRate, 
-                    i.fRate,
-                    d.fRate AS GoldRate
-               FROM Item11 i
-                INNER JOIN Division d ON i.fPurity = d.fName
+                    op.Itemcode AS fItemcode,
+                    op.fParent,
+                    i.fItemName,
+                    op.fPiecerate,
+                    op.fTax,
+                    op.Gms AS NetWt,
+                    op.Gross AS GrossWt,
+                    op.Wastage,
+                    op.Mc,
+                    op.StnChrg AS StoneCharges,
+                    op.fOthers,
+                    op.McAmount,
+                    op.fid,
+                    COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
+                    op.FImage1,
+                    op.FImage2,
+                    op.FImage3,
+                    op.FImage4,
+                    d.fRate AS GoldRate,
+                    op.fDate,
+                    CASE WHEN w.fProductCode IS NOT NULL THEN 'Y' ELSE 'N' END AS IsWishlist
+                FROM ITEMPURCHASEOP op
+                JOIN item i ON i.fItemcode = op.Itemcode
+                LEFT JOIN Division d ON d.FCODE = op.fDiv
                 LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode
-                WHERE {baseCondition}
-                ORDER BY i.fItemcode
-                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+                WHERE op.Itemcode = @itemCode
+                ORDER BY op.fDate DESC
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         int offset = (pageNumber - 1) * pageSize;
-                        command.Parameters.AddWithValue("@fparent", parent + "%");
+
+                        // Add parameters properly
+                        command.Parameters.AddWithValue("@itemCode", itemCode ?? string.Empty);
+                        command.Parameters.AddWithValue("@customerCode", customerCode ?? string.Empty);
                         command.Parameters.AddWithValue("@Offset", offset);
                         command.Parameters.AddWithValue("@PageSize", pageSize);
-                        command.Parameters.AddWithValue("@customerCode", customerCode);
-                        if (!string.IsNullOrWhiteSpace(searchTerm))
-                        {
-                            command.Parameters.AddWithValue("@search", "%" + searchTerm + "%");
-                        }
 
                         using (SqlDataReader reader = await command.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                string pieceRate = reader["fPieceRate"]?.ToString();
-                                decimal weight = SafeGetDecimal(reader, "Weight");
-                                decimal NetWt = SafeGetDecimal(reader, "NetWt");
-                                decimal vaPercent = SafeGetDecimal(reader, "fVA");
-                                decimal vaGrams = SafeGetDecimal(reader, "fVAGMS");
-                                decimal mc = SafeGetDecimal(reader, "fMc");
-                                decimal others = SafeGetDecimal(reader, "fOthers");
-                                decimal stoneCharges = SafeGetDecimal(reader, "fStoneCharges");
-                                decimal taxPercent = SafeGetDecimal(reader, "fTax");
+                                string piecerateFlag = reader["fPiecerate"]?.ToString();
+                                decimal netWt = SafeGetDecimal(reader, "NetWt");
+                                decimal grossWt = SafeGetDecimal(reader, "GrossWt");
+                                decimal wastage = SafeGetDecimal(reader, "Wastage");
+                                decimal mc = SafeGetDecimal(reader, "McAmount");
+                                decimal stoneCharges = SafeGetDecimal(reader, "StoneCharges");
+                                decimal fOthers = SafeGetDecimal(reader, "fOthers");
+                                decimal mcAmount = SafeGetDecimal(reader, "McAmount");
+                                decimal tax = SafeGetDecimal(reader, "fTax");
                                 decimal goldRate = SafeGetDecimal(reader, "GoldRate");
-                                decimal fRate = SafeGetDecimal(reader, "fRate");
 
-                                decimal totalItemPrice = 0;
-                                if (pieceRate == "Y")
+                                decimal totalAmount = 0;
+
+                                // Price calculation
+                                if (piecerateFlag?.ToUpper() == "Y")
                                 {
-                                    totalItemPrice = fRate + mc + others + stoneCharges;
+                                    totalAmount = mcAmount + tax;
                                 }
                                 else
                                 {
-                                    decimal totalWastage = (vaGrams > 0) ? vaGrams : (NetWt * vaPercent / 100);
-                                    decimal totalWeightWithWastage = NetWt + totalWastage;
-                                    totalItemPrice = (totalWeightWithWastage * goldRate) + mc + others + stoneCharges;
+                                    totalAmount = PriceCalculator.CalculatePrice(
+                                    null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
+                                ).TotalAmount;
                                 }
 
-                                decimal taxAmount = (taxPercent > 0) ? (totalItemPrice * taxPercent / 100) : 0;
-                                totalItemPrice += taxAmount;
-
-                                itemsList.Add(new ListAllItem
+                                ItemsList.Add(new
                                 {
-                                    ItemCode = reader["fItemcode"]?.ToString() ?? "",
-                                    ItemName = reader["fItemName"]?.ToString() ?? "",
+                                    fItemcode = reader["fItemcode"]?.ToString(),
+                                    fItemName = reader["fItemName"]?.ToString(),
+                                    fParent = reader["fParent"]?.ToString(),
+                                    NetWt = netWt,
+                                    GrossWt = grossWt,
+                                    Wastage = wastage,
+                                    fMc = mc,
+                                    StoneCharges = stoneCharges,
+                                    fOthers = fOthers,
+                                    McAmount = mcAmount,
+                                    fTax = tax,
+                                    GoldRate = goldRate,
+                                    TotalAmount = totalAmount,
+                                    fimage = reader["fimage"]?.ToString() ?? string.Empty,
+                                    fimage1 = reader["FImage1"]?.ToString(),
+                                    fimage2 = reader["FImage2"]?.ToString(),
+                                    fimage3 = reader["FImage3"]?.ToString(),
+                                    fimage4 = reader["FImage4"]?.ToString(),
                                     IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
-                                    fparent = reader["fparent"]?.ToString() ?? "",
-                                    Image = reader["fimage"]?.ToString() ?? "",
-                                    TotalPrice = totalItemPrice
+                                    fID = reader["fid"]?.ToString()
                                 });
                             }
                         }
                     }
                 }
 
-                var paginationResponse = new
-                {
-                    totalRecords,
-                    totalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                    pageNumber,
-                    pageSize,
-                    items = itemsList
-                };
-
-                return Ok(paginationResponse);
+                return Ok(new { items = ItemsList });
             }
             catch (SqlException sqlEx)
             {

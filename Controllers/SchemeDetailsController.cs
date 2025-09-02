@@ -13,7 +13,7 @@ using Microsoft.Extensions.Hosting;
 namespace CHITSCHEME.Controllers
 {
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize] 
     [ApiController]
     public class SchemeDetailsController : ControllerBase
     {
