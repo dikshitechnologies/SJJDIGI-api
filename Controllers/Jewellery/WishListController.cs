@@ -154,28 +154,33 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                     string query = @"
                 SELECT 
-                    W.fWishlistId AS CartId,
-                    W.fProductCode AS fItemcode,
-                    W.fCusCode,
-                    op.fParent,
-                    i.fItemName,
-                    COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
-                    op.fPieceRate,
-                    op.Gms AS NetWt,
-                    op.Gross AS fGrossWt,
-                    op.Wastage,
-                    op.McAmount,
-                    op.fOthers,
-                    op.fTax,
-                    op.StnChrg AS StoneCharges,
-                    d.fRate AS GoldRate,
-                    op.FID
-                FROM Wishlist W
-                INNER JOIN ITEMPURCHASEOP op ON op.fID = W.FID
-                LEFT JOIN Division d ON op.fDiv = d.fcode
-                JOIN item i ON W.fProductCode = op.Itemcode
-                WHERE W.fCusCode = @fCusCode 
-                ORDER BY W.fWishlistId DESC;";
+                W.fWishlistId AS CartId,
+                W.fProductCode AS fItemcode,
+                W.fCusCode,
+                op.fParent,
+                i.fItemName,
+                COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
+                op.fPieceRate,
+                op.Gms AS NetWt,
+                op.Gross AS fGrossWt,
+                op.Wastage,
+                op.McAmount,
+                op.fOthers,
+                op.fTax,
+                op.StnChrg AS StoneCharges,
+                d.fRate AS GoldRate,
+                op.FID
+            FROM Wishlist W
+            JOIN (
+                SELECT Itemcode, MAX(fID) AS LastFID
+                FROM ITEMPURCHASEOP
+                GROUP BY Itemcode
+            ) latest ON W.fProductCode = latest.Itemcode
+            JOIN ITEMPURCHASEOP op ON op.fID = latest.LastFID
+            LEFT JOIN Division d ON op.fDiv = d.fcode
+            JOIN item i ON W.fProductCode = i.fItemcode
+            WHERE W.fCusCode = fCusCode
+            ORDER BY W.fWishlistId DESC;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
@@ -260,7 +265,10 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
         [HttpDelete("WishlistDeleteItem/{itemCode}/{FID}")]
-        public IActionResult RemoveCartItem(string itemCode, [FromQuery] string fCusCode ,string FID)
+        public IActionResult RemoveCartItem(
+     [FromRoute] string itemCode,
+     [FromRoute] string FID,
+     [FromQuery] string fCusCode)
         {
             try
             {
@@ -269,14 +277,14 @@ namespace CHITSCHEME.Controllers.Jewellery
                     connection.Open();
 
                     string query = @"
-                DELETE FROM Wishlist 
-                WHERE fProductCode = @itemCode AND fCusCode = @fCusCode and fid=@fid";
+                DELETE FROM wishlist 
+                WHERE fProductCode = @itemCode AND fCusCode = @fCusCode AND fid = @fid";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@itemCode", itemCode);
                         command.Parameters.AddWithValue("@fCusCode", fCusCode);
-                        command.Parameters.AddWithValue("@FID", FID);
+                        command.Parameters.AddWithValue("@fid", FID);
 
                         int rowsAffected = command.ExecuteNonQuery();
 
@@ -286,7 +294,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                         }
                         else
                         {
-                            return NotFound();
+                            return NotFound("Item not found.");
                         }
                     }
                 }
@@ -296,6 +304,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 return StatusCode(500, $"Internal Server Error: {ex.Message}");
             }
         }
+
     }
 }
 
