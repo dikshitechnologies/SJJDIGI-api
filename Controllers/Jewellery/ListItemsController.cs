@@ -10,7 +10,7 @@ using Microsoft.Extensions.Configuration;
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
-    [Authorize]
+    //[Authorize]
     [ApiController]
     public class ListItemsController : ControllerBase
     {
@@ -255,10 +255,16 @@ namespace CHITSCHEME.Controllers.Jewellery
 
         //------------------------------------------------ Items Details ------------------------------------
         [HttpGet]
-        [Route("itemDetails/{parentCode}")]
-        public async Task<IActionResult> itemDetails([FromRoute] string parentCode, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] string customerCode = "")
+        [Route("itemDetails/{itemCode}")]
+        public async Task<IActionResult> itemDetails(
+      [FromRoute] string itemCode,
+      [FromQuery] int pageNumber = 1,
+      [FromQuery] int pageSize = 20,
+      [FromQuery] string customerCode = "",
+      [FromQuery] string fID = ""
+  )
         {
-            List<ListAllItem> ItemsList = new List<ListAllItem>();
+            var ItemsList = new List<object>();
 
             try
             {
@@ -267,108 +273,100 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await connection.OpenAsync();
 
                     string query = @"
-            SELECT 
-                i.fItemcode,
-                i.fParent,
-                i.fItemName,
-                i.fDesignNo,
-                i.fimage,
-                i.fPurity,
-                i.Color,
-                i.size,
-                i.Weight,
-                i.NetWt,
-                i.fGrossWt,
-                i.LessWt,
-                i.fVA,
-                i.fVAGMS,
-                i.fMc,
-                i.fOthers,
-                i.fTax,
-                i.fStoneCharges,
-                i.fimage2,
-                i.fimage3,
-                i.fimage4,
-                i.fPieceRate,
-                i.fRate,
-                d.fRate AS GoldRate,
-                i.fdescription,
-                CASE WHEN w.fProductCode IS NOT NULL THEN 'Y' ELSE 'N' END AS IsWishlist
-            FROM 
-                Item11 i
-            LEFT JOIN 
-                Division d ON i.fPurity = d.fName
-            LEFT JOIN 
-            Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode
-            WHERE 
-                (i.fparent =@fparent)
-            ORDER BY i.fItemcode
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+                SELECT 
+                    op.Itemcode AS fItemcode,
+                    op.fParent,
+                    i.fItemName,
+                    op.fPiecerate,
+                    op.fTax,
+                    op.Gms AS NetWt,
+                    op.Gross AS GrossWt,
+                    op.Wastage,
+                    op.Mc,
+                    op.StnChrg AS StoneCharges,
+                    op.fOthers,
+                    op.McAmount,
+                    op.fid,
+                    COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
+                    op.FImage1,
+                    op.FImage2,
+                    op.FImage3,
+                    op.FImage4,
+                    d.fRate AS GoldRate,
+                    op.fDate,
+                    CASE WHEN w.fProductCode IS NOT NULL THEN 'Y' ELSE 'N' END AS IsWishlist
+                FROM ITEMPURCHASEOP op
+                JOIN item i ON i.fItemcode = op.Itemcode
+                LEFT JOIN Division d ON d.FCODE = op.fDiv
+                LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode
+                WHERE op.Itemcode = @itemCode
+                    AND (@fID = '' OR op.fid = @fID)
+                ORDER BY op.fDate DESC
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         int offset = (pageNumber - 1) * pageSize;
-                        command.Parameters.AddWithValue("@fparent", parentCode);
+
+                        // Add parameters properly
+                        command.Parameters.AddWithValue("@itemCode", itemCode ?? string.Empty);
+                        command.Parameters.AddWithValue("@fID", fID ?? string.Empty);
+                        command.Parameters.AddWithValue("@customerCode", customerCode ?? string.Empty);
                         command.Parameters.AddWithValue("@Offset", offset);
                         command.Parameters.AddWithValue("@PageSize", pageSize);
-                        command.Parameters.AddWithValue("@customerCode", customerCode);
 
-                        using (SqlDataReader reader = command.ExecuteReader())
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
                         {
-                            if (reader.Read())
+                            while (await reader.ReadAsync())
                             {
-                                string pieceRate = reader["fPieceRate"]?.ToString();
-                                decimal baseWeight = SafeGetDecimal(reader, "Weight");
+                                string piecerateFlag = reader["fPiecerate"]?.ToString();
                                 decimal netWt = SafeGetDecimal(reader, "NetWt");
-                                decimal lessWt = SafeGetDecimal(reader, "LessWt");
-                                decimal fGrossWt = SafeGetDecimal(reader, "fGrossWt");
-                                decimal fVA = SafeGetDecimal(reader, "fVA");
-                                decimal fVAGMS = SafeGetDecimal(reader, "fVAGMS");
-                                decimal fMc = SafeGetDecimal(reader, "fMc");
-                                decimal fStoneCharges = SafeGetDecimal(reader, "fStoneCharges");
-                                decimal fTax = SafeGetDecimal(reader, "fTax");
+                                decimal grossWt = SafeGetDecimal(reader, "GrossWt");
+                                decimal wastage = SafeGetDecimal(reader, "Wastage");
+                                decimal mc = SafeGetDecimal(reader, "McAmount");
+                                decimal stoneCharges = SafeGetDecimal(reader, "StoneCharges");
                                 decimal fOthers = SafeGetDecimal(reader, "fOthers");
+                                decimal mcAmount = SafeGetDecimal(reader, "McAmount");
+                                decimal tax = SafeGetDecimal(reader, "fTax");
                                 decimal goldRate = SafeGetDecimal(reader, "GoldRate");
-                                decimal fRate = SafeGetDecimal(reader, "fRate");
 
-                                var result = PriceCalculator.CalculatePrice(pieceRate, netWt, fVA, fVAGMS, fRate, fMc, fOthers, fStoneCharges, fTax, goldRate);
-                                decimal totalAmount = result.TotalAmount;
-                                decimal taxAmount = result.TaxAmount;
+                                decimal totalAmount = 0;
 
-                                var productDetails = new
+                                // Price calculation
+                                if (piecerateFlag?.ToUpper() == "Y")
                                 {
-                                    fItemcode = reader["fItemcode"]?.ToString() ?? null,
-                                    fItemName = reader["fItemName"]?.ToString() ?? null,
-                                    fDesignNo = reader["fDesignNo"]?.ToString() ?? null,
-                                    fimage = reader["fimage"]?.ToString() ?? string.Empty,
-                                    fPurity = reader["fPurity"]?.ToString() ?? null,
-                                    Color = reader["Color"]?.ToString() ?? null,
-                                    Size = reader["size"]?.ToString() ?? null,
-                                    fParent = reader["fParent"]?.ToString() ?? null,
-                                    BaseWeight = baseWeight,
-                                    NetWt = netWt,
-                                    LessWt = lessWt,
-                                    fGrossWt = fGrossWt,
-                                    fVA = fVA,
-                                    fVAGMS = fVAGMS,
-                                    TotalWastage = result.TotalWastage,
-                                    TotalWeightWithWastage = result.TotalWeightWithWastage,
-                                    GoldRate = goldRate,
-                                    TodayRate = result.TodayRate,
-                                    fMc = fMc,
-                                    TaxAmount = taxAmount,
-                                    fTax = fTax,
-                                    fOthers = fOthers,
-                                    fStoneCharges = fStoneCharges,
-                                    fimage2 = reader["fimage2"]?.ToString() ?? string.Empty,
-                                    fimage3 = reader["fimage3"]?.ToString() ?? string.Empty,
-                                    fimage4 = reader["fimage4"]?.ToString() ?? string.Empty,
-                                    TotalAmount = totalAmount,
-                                    fdescription = reader["fdescription"]?.ToString() ?? "Description not available",
-                                    IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
-                                };
+                                    totalAmount = mcAmount + tax;
+                                }
+                                else
+                                {
+                                    totalAmount = PriceCalculator.CalculatePrice(
+                                    null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
+                                ).TotalAmount;
+                                }
 
-                                return Ok(productDetails);
+                                ItemsList.Add(new
+                                {
+                                    fItemcode = reader["fItemcode"]?.ToString(),
+                                    fItemName = reader["fItemName"]?.ToString(),
+                                    fParent = reader["fParent"]?.ToString(),
+                                    NetWt = netWt,
+                                    GrossWt = grossWt,
+                                    Wastage = wastage,
+                                    fMc = mc,
+                                    StoneCharges = stoneCharges,
+                                    fOthers = fOthers,
+                                    McAmount = mcAmount,
+                                    fTax = tax,
+                                    GoldRate = goldRate,
+                                    TotalAmount = totalAmount,
+                                    fimage = reader["fimage"]?.ToString() ?? string.Empty,
+                                    fimage1 = reader["FImage1"]?.ToString(),
+                                    fimage2 = reader["FImage2"]?.ToString(),
+                                    fimage3 = reader["FImage3"]?.ToString(),
+                                    fimage4 = reader["FImage4"]?.ToString(),
+                                    IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
+                                    fID = reader["fid"]?.ToString()
+                                });
                             }
                         }
                     }
@@ -385,6 +383,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 return StatusCode(500, new { error = "Unexpected error occurred.", details = ex.Message });
             }
         }
+
 
         [HttpGet]
         [Route("SearchItems/{parentCode}")]
@@ -421,7 +420,7 @@ namespace CHITSCHEME.Controllers.Jewellery
             i.fimage4,
             i.fPieceRate,
             i.fRate,
-            d.fRate AS GoldRate,
+            d.fRate AS GoldRate,    
             I.NetWt, 
             i.LessWt,
             I.fVA, 
@@ -496,7 +495,6 @@ namespace CHITSCHEME.Controllers.Jewellery
         }
 
         //----------------------------------------------Hompage NewArrivals 20 Items -------------------------------------------
-
         [HttpGet("NewArrivals")]
         public async Task<IActionResult> NewArrivals()
         {
@@ -505,41 +503,27 @@ namespace CHITSCHEME.Controllers.Jewellery
                 var items = new List<JewelleryItem>();
 
                 string query = @"
-        SELECT TOP 20 
-            I.FITEMCODE,
-            I.FPARENT,
-            I.FITEMNAME, 
-            I.FIMAGE, 
-            I.fPieceRate, 
-            I.fRate,  
-            I.Weight, 
-            i.NetWt,
-            i.fGrossWt,
-            i.LessWt,
-            i.fVA,
-            i.fVAGMS,
-            i.fMc,
-            i.fOthers,
-            i.fTax,
-            i.fStoneCharges,
-            i.fimage2,
-            i.fimage3,
-            i.fimage4,
-            i.fPieceRate,
-            i.fRate,
-            d.fRate AS GoldRate,
-            I.NetWt, 
-            i.LessWt,
-            I.fVA, 
-            I.fVAGMS, 
-            I.fMc, 
-            I.fOthers, 
-            I.fStoneCharges, 
-            D.fRate AS GoldRate
-        FROM ITEM11 I 
-        JOIN DIVISION D ON D.fName = I.fPurity  
-        WHERE fAclevel < '0' 
-        ORDER BY FITEMCODE DESC";
+            SELECT TOP 20
+                op.Itemcode AS ItemCode,
+                op.fParent,
+                i.fItemName,
+                COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS FinalImage,
+                op.fPiecerate,
+                op.fTax,
+                op.Gms AS NetWt,
+                op.Gross AS GrossWt,
+                op.Wastage,
+                op.Mc,
+                op.StnChrg AS StoneCharges,
+                op.fOthers,
+                op.McAmount,
+                d.fRate AS GoldRate,
+                op.fDate
+            FROM ITEMPURCHASEOP op
+            JOIN item i ON i.fItemcode = op.Itemcode
+            LEFT JOIN Division d ON d.fCode = op.fDiv
+            WHERE i.fAclevel < 0
+            ORDER BY op.fDate DESC;";
 
                 using (SqlConnection connection = new SqlConnection(DBHelper.GetConnection()))
                 {
@@ -550,29 +534,37 @@ namespace CHITSCHEME.Controllers.Jewellery
                     {
                         while (await reader.ReadAsync())
                         {
-                            string pieceRate = reader["fPieceRate"]?.ToString();
-                            decimal baseWeight = SafeGetDecimal(reader, "Weight");
+                            decimal totalAmount = 0;
+
+                            // Read fields
+                            string piecerateFlag = reader["fPiecerate"]?.ToString();
+                            decimal mcAmount = SafeGetDecimal(reader, "McAmount");
+                            decimal tax = SafeGetDecimal(reader, "fTax");
                             decimal netWt = SafeGetDecimal(reader, "NetWt");
-                            decimal lessWt = SafeGetDecimal(reader, "LessWt");
-                            decimal fGrossWt = SafeGetDecimal(reader, "fGrossWt");
-                            decimal fVA = SafeGetDecimal(reader, "fVA");
-                            decimal fVAGMS = SafeGetDecimal(reader, "fVAGMS");
-                            decimal fMc = SafeGetDecimal(reader, "fMc");
-                            decimal fStoneCharges = SafeGetDecimal(reader, "fStoneCharges");
-                            decimal fTax = SafeGetDecimal(reader, "fTax");
+                            decimal wastage = SafeGetDecimal(reader, "Wastage");
+                            decimal mc = SafeGetDecimal(reader, "McAmount");
+                            decimal stoneCharges = SafeGetDecimal(reader, "StoneCharges");
                             decimal fOthers = SafeGetDecimal(reader, "fOthers");
                             decimal goldRate = SafeGetDecimal(reader, "GoldRate");
-                            decimal fRate = SafeGetDecimal(reader, "fRate");
 
-                            var result = PriceCalculator.CalculatePrice(pieceRate, netWt, fVA, fVAGMS, fRate, fMc, fOthers, fStoneCharges, fTax, goldRate);
-                            decimal totalAmount = result.TotalAmount;
+                            // Calculate total price
+                            if (piecerateFlag?.ToUpper() == "Y")
+                            {
+                                totalAmount = mcAmount + tax;
+                            }
+                            else
+                            {
+                                totalAmount = PriceCalculator.CalculatePrice(
+                                    null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
+                                ).TotalAmount;
+                            }
 
                             items.Add(new JewelleryItem
                             {
-                                ItemCode = reader["FITEMCODE"].ToString(),
-                                fparent = reader["FPARENT"].ToString(),
-                                Name = reader["FITEMNAME"].ToString(),
-                                Image = reader["FIMAGE"] != DBNull.Value ? reader["FIMAGE"].ToString() : null,
+                                ItemCode = reader["ItemCode"].ToString(),
+                                fparent = reader["fParent"].ToString(),
+                                Name = reader["fItemName"].ToString(),
+                                Image = reader["FinalImage"]?.ToString(),
                                 Price = totalAmount
                             });
                         }
@@ -590,6 +582,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                 return StatusCode(500, new { error = "Unexpected error occurred.", details = ex.Message });
             }
         }
+
+
 
 
         //-----------------------------------Selected List Items ----------------------------------------
