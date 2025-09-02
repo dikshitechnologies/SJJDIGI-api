@@ -17,6 +17,270 @@ namespace CHITSCHEME.Controllers
     [ApiController]
     public class SchemeDetailsController : ControllerBase
     {
+        //        [HttpGet("schemeList")]
+        //        public async Task<IActionResult> GetSchemeDetails([FromHeader] string authorization)
+        //        {
+        //            if (string.IsNullOrEmpty(authorization) || !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        //            {
+        //                return Unauthorized(new { message = "Authorization header is missing or invalid." });
+        //            }
+
+        //            var token = authorization.Substring("Bearer ".Length).Trim();
+        //            var phone = JwtHelper.GetPhoneFromJwtToken(token);
+
+        //            if (string.IsNullOrEmpty(phone))
+        //            {
+        //                return Unauthorized(new { message = "Invalid token." });
+        //            }
+
+        //            var connectionString = DBHelper.GetConnection();
+
+        //            try
+        //            {
+        //                using var connection = new SqlConnection(connectionString);
+        //                await connection.OpenAsync();
+
+        //                var schemeRate = await GetSchemeRateAsync(connection);
+
+        //                var query = @"
+
+        //WITH RankedSchemes AS (
+        //    SELECT 
+        //        P.FCODE,
+        //        P.FACNAME,
+        //        P.FPHONE,
+        //        P.FAMOUNT,
+        //        P.FCOMPCODE,
+        //        P.FDUE,
+        //        L.fvrno,
+        //        P.FID AS SCHEMECODE,
+        //        P.FSCHEMETYPE,
+        //        CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
+        //        IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
+        //        PARENT.FACNAME AS SCHEMENAME,
+        //        ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
+        //        CASE 
+        //          WHEN EXISTS (
+        //            SELECT 1 
+        //            FROM LEDGER L3
+        //            JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
+        //            WHERE 
+        //              L3.FID = P.FID 
+        //               AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
+        //              AND L3.fCrDb = 'CR' 
+        //              AND L3.FTYPE = 'CT'
+        //          ) THEN 'Y'
+        //          ELSE 'N'
+        //        END AS IS_CURRENT_MONTH_PAID
+        //    FROM PARTY P
+        //    LEFT JOIN (
+        // SELECT 
+        //            L1.FID,
+        //            L1.FVRNO,
+        //            L1.FDUE,
+        //            L1.FVRAMOUNT
+        //        FROM LEDGER L1
+        //        INNER JOIN (
+        //            SELECT FID, MAX(FVRNO) AS MaxFVRNO
+        //            FROM LEDGER L2
+        //            JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
+        //            WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
+        //            GROUP BY L2.FID
+        //        ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
+        //        JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
+        //        WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
+        //    ) L ON P.FID = L.FID
+        //    LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+        //    WHERE P.FPHONE = @phone AND P.FPARENT LIKE '0000100044%'
+        //)
+        //SELECT *
+        //FROM RankedSchemes
+        //WHERE rn = 1;
+
+        //";
+
+        //                using var command = new SqlCommand(query, connection);
+        //                command.Parameters.AddWithValue("@phone", phone);
+
+        //                using var reader = await command.ExecuteReaderAsync();
+
+        //                if (!reader.HasRows)
+        //                {
+        //                    return NotFound(new { message = "No Scheme found for the Provided PhoneNo." });
+        //                }
+
+        //                var response = new SchemeResponse();
+        //                response.schemeDetails = new List<SchemeInfo>();
+
+        //                while (await reader.ReadAsync())
+        //                {
+        //                    if (response.fAcname == null)
+        //                    {
+        //                        response.fAcname = reader["FACNAME"]?.ToString();
+        //                        response.fphone = reader["FPHONE"]?.ToString();
+        //                        response.fCompCode = reader["FCOMPCODE"]?.ToString();
+        //                        response.GolRateAmt = schemeRate.ToString();
+        //                    }
+
+        //                    if (reader["FDUE_Comparison"]?.ToString() == "Y")
+        //                    {
+        //                        continue;
+        //                    }
+
+        //                    var fSchemeType = reader["FSCHEMETYPE"]?.ToString();
+        //                    string famount;
+        //                    string weight = null;
+
+        //                    if (fSchemeType == "W")
+        //                    {
+        //                        var payAmount = Convert.ToDecimal(reader["famount"] ?? 0);
+        //                        var goldRate = schemeRate;
+        //                        decimal calculatedWeight = 0;
+
+        //                        if (goldRate != 0)
+        //                        {
+        //                            calculatedWeight = payAmount / goldRate;
+        //                        }
+
+        //                        famount = payAmount.ToString("0.00");
+        //                        weight = calculatedWeight.ToString("0.000");
+        //                    }
+        //                    else
+        //                    {
+        //                        famount = reader["FAMOUNT"]?.ToString();
+        //                        weight = null;
+        //                    }
+
+        //                    response.schemeDetails.Add(new SchemeInfo
+        //                    {
+        //                        fcode = reader["FCODE"]?.ToString(),
+        //                        SchemeName = reader["SCHEMENAME"]?.ToString(),
+        //                        famount = famount,
+        //                        Weight = weight,
+        //                        goldrate= schemeRate.ToString(),
+        //                        SchemeCode = reader["SCHEMECODE"]?.ToString(),
+        //                        TotalDue = reader["FDUE"]?.ToString(),
+        //                        PaidDue = reader["PaidDue"]?.ToString(),
+        //                        FDUE_Comparison = reader["FDUE_Comparison"]?.ToString(),
+        //                        IS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]?.ToString(),
+
+        //                    });
+        //                }
+
+
+        //                return Ok(new
+        //                {
+        //                    // Common info (customer name, phone, etc.)
+        //                    common = new
+        //                    {
+        //                        facname = response.fAcname,
+        //                        fphone = response.fphone,
+        //                        fcompcode = response.fCompCode,
+        //                        goldRateAmt = response.GolRateAmt
+        //                    },
+
+        //                    // Example: Division Names or Live Rates (if you have them)
+        //                    divisionNames = new
+        //                    {
+        //                        gold22K = schemeRate, // map actual division rate
+        //                        gold24K = schemeRate, // adjust accordingly
+        //                        silver = 0            // replace with actual silver rate
+        //                    },
+
+        //                    // Now split schemes into categories
+        //                    ch = response.schemeDetails
+        //          .Where(s => s.SchemeCode.StartsWith("CH")) // example filter for chit
+        //          .Select(s => new
+        //          {
+        //              fcode = s.fcode,
+        //              schemename = s.SchemeName,
+        //              famount = s.famount,
+        //              totalGrams = s.Weight,
+        //              totalAmount = s.famount,
+        //              schemecode = s.SchemeCode,
+        //              paidDue = s.PaidDue,
+        //              fdue = s.TotalDue,
+        //              iS_CURRENT_MONTH_PAID = s.IS_CURRENT_MONTH_PAID,
+        //              fcompcode = s.goldrate
+        //          }),
+
+        //                    dG22K = response.schemeDetails
+        //          .Where(s => s.SchemeCode.Contains("22K")) // example filter for 22K
+        //          .Select(s => new
+        //          {
+        //              fcode = s.fcode,
+        //              schemename = s.SchemeName,
+        //              famount = s.famount,
+        //              totalGrams = s.Weight,
+        //              totalAmount = s.famount,
+        //              schemecode = s.SchemeCode,
+        //              paidDue = s.PaidDue,
+        //              fdue = s.TotalDue,
+        //              iS_CURRENT_MONTH_PAID = s.IS_CURRENT_MONTH_PAID,
+        //              fcompcode = s.goldrate
+        //          }),
+
+        //                    dG24K = response.schemeDetails
+        //          .Where(s => s.SchemeCode.Contains("24K")) // example filter for 24K
+        //          .Select(s => new
+        //          {
+        //              fcode = s.fcode,
+        //              schemename = s.SchemeName,
+        //              famount = s.famount,
+        //              totalGrams = s.Weight,
+        //              totalAmount = s.famount,
+        //              schemecode = s.SchemeCode,
+        //              paidDue = s.PaidDue,
+        //              fdue = s.TotalDue,
+        //              iS_CURRENT_MONTH_PAID = s.IS_CURRENT_MONTH_PAID,
+        //              fcompcode = s.goldrate
+        //          }),
+
+        //                    silver = response.schemeDetails
+        //          .Where(s => s.SchemeCode.Contains("SILVER")) // example filter for silver
+        //          .Select(s => new
+        //          {
+        //              fcode = s.fcode,
+        //              schemename = s.SchemeName,
+        //              famount = s.famount,
+        //              totalGrams = s.Weight,
+        //              totalAmount = s.famount,
+        //              schemecode = s.SchemeCode,
+        //              paidDue = s.PaidDue,
+        //              fdue = s.TotalDue,
+        //              iS_CURRENT_MONTH_PAID = s.IS_CURRENT_MONTH_PAID,
+        //              fcompcode = s.goldrate
+        //          })
+        //                });
+
+        //            }
+        //            catch (SqlException)
+        //            {
+        //                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Database error. Please try again later." });
+        //            }
+        //            catch (Exception)
+        //            {
+        //                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unexpected error occurred. Please try again later." });
+        //            }
+        //        }
+
+
+        public class CommonDto
+        {
+            public string FacName { get; set; }
+            public string FPhone { get; set; }
+            public string FCompCode { get; set; }
+            public string GolRateAmt { get; set; }
+        }
+
+        public class DivisionRateDto
+        {
+            public string FCode { get; set; }
+            public string FName { get; set; }
+            public string FRate { get; set; }
+        }
+
+
         [HttpGet("schemeList")]
         public async Task<IActionResult> GetSchemeDetails([FromHeader] string authorization)
         {
@@ -40,135 +304,134 @@ namespace CHITSCHEME.Controllers
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
-                var schemeRate = await GetSchemeRateAsync(connection);
+                // ✅ 1. Fetch Division Names (this already gives you 22K & 24K rates)
+                var divisionQuery = "SELECT fcode, fName, frate FROM Division WHERE fcode IN ('0003','0004')";
+                var divisionNames = new List<object>();
 
-                var query = @"
-
-WITH RankedSchemes AS (
-    SELECT 
-        P.FCODE,
-        P.FACNAME,
-        P.FPHONE,
-        P.FAMOUNT,
-        P.FCOMPCODE,
-        P.FDUE,
-        L.fvrno,
-        P.FID AS SCHEMECODE,
-        P.FSCHEMETYPE,
-        CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
-        IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
-        PARENT.FACNAME AS SCHEMENAME,
-        ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 
-            FROM LEDGER L3
-            JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
-            WHERE 
-              L3.FID = P.FID 
-               AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
-              AND L3.fCrDb = 'CR' 
-              AND L3.FTYPE = 'CT'
-          ) THEN 'Y'
-          ELSE 'N'
-        END AS IS_CURRENT_MONTH_PAID
-    FROM PARTY P
-    LEFT JOIN (
- SELECT 
-            L1.FID,
-            L1.FVRNO,
-            L1.FDUE,
-            L1.FVRAMOUNT
-        FROM LEDGER L1
-        INNER JOIN (
-            SELECT FID, MAX(FVRNO) AS MaxFVRNO
-            FROM LEDGER L2
-            JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
-            WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
-            GROUP BY L2.FID
-        ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
-        JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
-        WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
-    ) L ON P.FID = L.FID
-    LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
-    WHERE P.FPHONE = @phone AND P.FPARENT LIKE '0000100044%'
-)
-SELECT *
-FROM RankedSchemes
-WHERE rn = 1;
-
-";
-
-                using var command = new SqlCommand(query, connection);
-                command.Parameters.AddWithValue("@phone", phone);
-
-                using var reader = await command.ExecuteReaderAsync();
-
-                if (!reader.HasRows)
+                using (var divCmd = new SqlCommand(divisionQuery, connection))
+                using (var divReader = await divCmd.ExecuteReaderAsync())
                 {
-                    return NotFound(new { message = "No Scheme found for the Provided PhoneNo." });
+                    while (await divReader.ReadAsync())
+                    {
+                        divisionNames.Add(new
+                        {
+                            fcode = divReader["fcode"]?.ToString(),
+                            fname = divReader["fName"]?.ToString(),
+                            fRate = divReader["frate"]?.ToString()
+                        });
+                    }
                 }
 
-                var response = new SchemeResponse();
-                response.schemeDetails = new List<SchemeInfo>();
+                // ✅ 2. Fetch Schemes
+                var schemeQuery = @"WITH RankedSchemes AS (
+            SELECT 
+                P.FCODE,
+                P.FACNAME,
+                P.FPHONE,
+                P.FAMOUNT,
+                P.FCOMPCODE,
+                P.FDUE,
+                P.FDIGICR,
+                P.FDIGITYPE,
+                P.FID AS SCHEMECODE,
+                P.FSCHEMETYPE,
+                CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
+                IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
+                PARENT.FACNAME AS SCHEMENAME,
+                ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
+                CASE 
+                  WHEN EXISTS (
+                    SELECT 1 
+                    FROM LEDGER L3
+                    JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
+                    WHERE 
+                      L3.FID = P.FID 
+                       AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
+                      AND L3.fCrDb = 'CR' 
+                      AND L3.FTYPE = 'CT'
+                  ) THEN 'Y'
+                  ELSE 'N'
+                END AS IS_CURRENT_MONTH_PAID
+            FROM PARTY P
+            LEFT JOIN (
+                SELECT 
+                    L1.FID,
+                    L1.FVRNO,
+                    L1.FDUE,
+                    L1.FVRAMOUNT
+                FROM LEDGER L1
+                INNER JOIN (
+                    SELECT FID, MAX(FVRNO) AS MaxFVRNO
+                    FROM LEDGER L2
+                    JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
+                    WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
+                    GROUP BY L2.FID
+                ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
+                JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
+                WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
+            ) L ON P.FID = L.FID
+            LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+            WHERE P.FPHONE = @phone AND P.FPARENT LIKE '0000100044%'
+        )
+        SELECT *
+        FROM RankedSchemes
+        WHERE rn = 1;";
+
+                CommonDto common = null;
+                var chList = new List<object>();
+                var dg22kList = new List<object>();
+                var dg24kList = new List<object>();
+                var silverList = new List<object>();
+
+                using var cmd = new SqlCommand(schemeQuery, connection);
+                cmd.Parameters.AddWithValue("@phone", phone);
+
+                using var reader = await cmd.ExecuteReaderAsync();
 
                 while (await reader.ReadAsync())
                 {
-                    if (response.fAcname == null)
+                    if (common == null && reader["FACNAME"] != DBNull.Value)
                     {
-                        response.fAcname = reader["FACNAME"]?.ToString();
-                        response.fphone = reader["FPHONE"]?.ToString();
-                        response.fCompCode = reader["FCOMPCODE"]?.ToString();
-                        response.GolRateAmt = schemeRate.ToString();
-                    }
-
-                    if (reader["FDUE_Comparison"]?.ToString() == "Y")
-                    {
-                        continue;
-                    }
-
-                    var fSchemeType = reader["FSCHEMETYPE"]?.ToString();
-                    string famount;
-                    string weight = null;
-
-                    if (fSchemeType == "W")
-                    {
-                        var payAmount = Convert.ToDecimal(reader["famount"] ?? 0);
-                        var goldRate = schemeRate;
-                        decimal calculatedWeight = 0;
-
-                        if (goldRate != 0)
+                        common = new CommonDto
                         {
-                            calculatedWeight = payAmount / goldRate;
-                        }
-
-                        famount = payAmount.ToString("0.00");
-                        weight = calculatedWeight.ToString("0.000");
-                    }
-                    else
-                    {
-                        famount = reader["FAMOUNT"]?.ToString();
-                        weight = null;
+                            FacName = reader["FACNAME"]?.ToString(),
+                            FPhone = reader["FPHONE"]?.ToString(),
+                            FCompCode = reader["FCOMPCODE"]?.ToString(),
+                            GolRateAmt = null // ❌ removed schemeRate (you can drop this property if unused)
+                        };
                     }
 
-                    response.schemeDetails.Add(new SchemeInfo
+                    var scheme = new
                     {
                         fcode = reader["FCODE"]?.ToString(),
-                        SchemeName = reader["SCHEMENAME"]?.ToString(),
-                        famount = famount,
-                        Weight = weight,
-                        goldrate= schemeRate.ToString(),
-                        SchemeCode = reader["SCHEMECODE"]?.ToString(),
-                        TotalDue = reader["FDUE"]?.ToString(),
-                        PaidDue = reader["PaidDue"]?.ToString(),
-                        FDUE_Comparison = reader["FDUE_Comparison"]?.ToString(),
-                        IS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]?.ToString(),
+                        schemename = reader["SCHEMENAME"]?.ToString(),
+                        famount = reader["FAMOUNT"]?.ToString(),
+                        schemecode = reader["SCHEMECODE"]?.ToString(),
+                        totalDue = reader["FDUE"]?.ToString(),
+                        paidDue = reader["PaidDue"]?.ToString(),
+                        fdue_comparison = reader["FDUE_Comparison"]?.ToString(),
+                        iS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]?.ToString(),
+                        fdigicr = reader["FDIGICR"]?.ToString(),
+                        fcompcode = reader["FCOMPCODE"]?.ToString()
+                    };
 
-                    });
+                    var digiType = reader["FDIGITYPE"]?.ToString();
+
+                    if (digiType == "CH") chList.Add(scheme);
+                    else if (digiType == "DG" && scheme.fdigicr == "22K") dg22kList.Add(scheme);
+                    else if (digiType == "DG" && scheme.fdigicr == "24K") dg24kList.Add(scheme);
+                    else if (digiType == "DS") silverList.Add(scheme);
                 }
 
-
-                return Ok(response);
+                return Ok(new
+                {
+                    common,
+                    divisionNames,
+                    ch = chList,
+                    dG22K = dg22kList,
+                    dG24K = dg24kList,
+                    silver = silverList
+                });
             }
             catch (SqlException)
             {
@@ -179,9 +442,6 @@ WHERE rn = 1;
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unexpected error occurred. Please try again later." });
             }
         }
-
-
-
 
 
 
@@ -618,6 +878,7 @@ public class SchemeInfo
     public string FDUE_Comparison { get; set; }
     public string Weight { get; set; }
     public string IS_CURRENT_MONTH_PAID { get; set; }
+    public string fdigicr { get; set; }
 }
 
 

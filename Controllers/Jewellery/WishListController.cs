@@ -64,8 +64,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                             }
                         }
 
-                        string insertQuery = "INSERT INTO Wishlist (fWishListId, fCusCode, fProductCode, fWdate) " +
-                                             "VALUES (@fWishListId, @fCusCode, @fProductCode, @fWdate)";
+                        string insertQuery = "INSERT INTO Wishlist (fWishListId, fCusCode, fProductCode, fWdate,FID) " +
+                                             "VALUES (@fWishListId, @fCusCode, @fProductCode, @fWdate,@FID)";
 
                         using (SqlCommand insertCommand = new SqlCommand(insertQuery, connection))
                         {
@@ -73,6 +73,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                             insertCommand.Parameters.AddWithValue("@fCusCode", wishlist.CusCode);
                             insertCommand.Parameters.AddWithValue("@fProductCode", wishlist.ProductCode);
                             insertCommand.Parameters.AddWithValue("@fWdate", DateTime.Now);
+                            insertCommand.Parameters.AddWithValue("@FID", wishlist.FID);
 
                             int insertResult = await insertCommand.ExecuteNonQueryAsync();
 
@@ -135,13 +136,15 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
 
-
         [HttpGet]
         [Route("WishlistViewItem")]
         public async Task<IActionResult> GetWishlistItems(string fCusCode)
         {
-            List<WishlistItem> wishlistItems = new List<WishlistItem>();
+            if (string.IsNullOrEmpty(fCusCode))
+                return BadRequest(new { message = "Customer ID is required." });
 
+            List<WishlistItem> wishlistItems = new List<WishlistItem>();
+            decimal AlltotalAmount = 0;
 
             try
             {
@@ -150,46 +153,29 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await connection.OpenAsync();
 
                     string query = @"
-                        SELECT 
-                     C.fWishlistId, 
-                      I.FITEMCODE,
-                    I.FPARENT,
-                    I.FITEMNAME, 
-                    I.FIMAGE, 
-                    I.fPieceRate, 
-                    I.fRate,  
-                    I.Weight, 
-                    i.NetWt,
-                    i.fGrossWt,
-                    i.LessWt,
-                    i.fVA,
-                    i.fVAGMS,
-                    i.fMc,
-                    i.fOthers,
-                    i.fTax,
-                    i.fStoneCharges,
-                    i.fimage2,
-                    i.fimage3,
-                    i.fimage4,
-                    i.fPieceRate,
-                    i.fRate,
+                SELECT 
+                    W.fWishlistId AS CartId,
+                    W.fProductCode AS fItemcode,
+                    W.fCusCode,
+                    op.fParent,
+                    i.fItemName,
+                    COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
+                    op.fPieceRate,
+                    op.Gms AS NetWt,
+                    op.Gross AS fGrossWt,
+                    op.Wastage,
+                    op.McAmount,
+                    op.fOthers,
+                    op.fTax,
+                    op.StnChrg AS StoneCharges,
                     d.fRate AS GoldRate,
-                    I.NetWt, 
-                    i.LessWt,
-                    I.fVA, 
-                    I.fVAGMS, 
-                    I.fMc, 
-                    I.fOthers, 
-                    I.fStoneCharges, 
-                    D.fRate AS GoldRate
-                 FROM 
-                     Wishlist C 
-                 INNER JOIN 
-                     item11 i ON i.fItemcode = C.fProductCode
-                 INNER JOIN 
-                     Division D ON i.fPurity = d.fName
-                 WHERE 
-                     C.fCusCode =@fCusCode  order by c.fWishlistId desc";
+                    op.FID
+                FROM Wishlist W
+                INNER JOIN ITEMPURCHASEOP op ON op.fID = W.FID
+                LEFT JOIN Division d ON op.fDiv = d.fcode
+                JOIN item i ON W.fProductCode = op.Itemcode
+                WHERE W.fCusCode = @fCusCode 
+                ORDER BY W.fWishlistId DESC;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
@@ -199,64 +185,63 @@ namespace CHITSCHEME.Controllers.Jewellery
                         {
                             while (await reader.ReadAsync())
                             {
-                                string pieceRate = reader["fPieceRate"]?.ToString();
-                                decimal baseWeight = SafeGetDecimal(reader, "Weight");
+                                string piecerateFlag = reader["fPieceRate"]?.ToString();
                                 decimal netWt = SafeGetDecimal(reader, "NetWt");
-                                decimal lessWt = SafeGetDecimal(reader, "LessWt");
-                                decimal fGrossWt = SafeGetDecimal(reader, "fGrossWt");
-                                decimal fVA = SafeGetDecimal(reader, "fVA");
-                                decimal fVAGMS = SafeGetDecimal(reader, "fVAGMS");
-                                decimal fMc = SafeGetDecimal(reader, "fMc");
-                                decimal fStoneCharges = SafeGetDecimal(reader, "fStoneCharges");
-                                decimal fTax = SafeGetDecimal(reader, "fTax");
+                                decimal grossWt = SafeGetDecimal(reader, "fGrossWt");
+                                decimal wastage = SafeGetDecimal(reader, "Wastage");
+                                decimal mc = SafeGetDecimal(reader, "McAmount");
+                                decimal stoneCharges = SafeGetDecimal(reader, "StoneCharges");
                                 decimal fOthers = SafeGetDecimal(reader, "fOthers");
+                                decimal tax = SafeGetDecimal(reader, "fTax");
                                 decimal goldRate = SafeGetDecimal(reader, "GoldRate");
-                                decimal fRate = SafeGetDecimal(reader, "fRate");
 
-                                var result = PriceCalculator.CalculatePrice(pieceRate, netWt, fVA, fVAGMS, fRate, fMc, fOthers, fStoneCharges, fTax, goldRate);
-                                decimal totalAmount = result.TotalAmount;
-                                decimal taxAmount = result.TaxAmount;
+                                decimal totalAmount = 0;
 
-
-
-                                WishlistItem item = new WishlistItem
+                                // ---------------- Price calculation ----------------
+                                if (piecerateFlag?.ToUpper() == "Y")
                                 {
-                                    CartId = reader["fWishlistId"]?.ToString() ?? "",
+                                    totalAmount = mc + tax;
+                                }
+                                else
+                                {
+                                    var priceResult = PriceCalculator.CalculatePrice(
+                                        null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
+                                    );
+                                    totalAmount = priceResult.TotalAmount;
+                                }
+
+                                AlltotalAmount += totalAmount;
+
+                                wishlistItems.Add(new WishlistItem
+                                {
+                                    CartId = reader["CartId"]?.ToString() ?? "",
                                     ItemCode = reader["fItemcode"]?.ToString() ?? "",
-                                    fparent = reader["fparent"]?.ToString() ?? "",
+                                    fparent = reader["fParent"]?.ToString() ?? "",
                                     ItemName = reader["fItemName"]?.ToString() ?? "",
                                     Image = reader["fimage"]?.ToString() ?? "",
-                                    TotalPrice = totalAmount,
-                                };
-
-                                wishlistItems.Add(item);
+                                    FID = reader["FID"]?.ToString() ?? "",
+                                    TodayRate = goldRate,
+                                    TotalPrice = totalAmount
+                                });
                             }
                         }
                     }
                 }
 
                 if (wishlistItems.Count == 0)
-                {
-                    return Ok(new { wishlistItems = new List<WishlistItem>() });
-                }
-
+                    return NotFound(new { message = "No items found in wishlist." });
 
                 return Ok(new
                 {
+                    AlltotalAmount,
                     wishlistItems
                 });
             }
-            catch (SqlException sqlEx)
-            {
-                return StatusCode(500, new { message = "Database error occurred.", details = sqlEx.Message });
-            }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An unexpected error occurred.", details = ex.Message });
+                return StatusCode(500, new { error = "An error occurred.", details = ex.Message });
             }
         }
-
-
 
 
 
@@ -274,8 +259,8 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
 
-        [HttpDelete("WishlistDeleteItem/{itemCode}")]
-        public IActionResult RemoveCartItem(string itemCode, [FromQuery] string fCusCode)
+        [HttpDelete("WishlistDeleteItem/{itemCode}/{FID}")]
+        public IActionResult RemoveCartItem(string itemCode, [FromQuery] string fCusCode ,string FID)
         {
             try
             {
@@ -285,12 +270,13 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                     string query = @"
                 DELETE FROM Wishlist 
-                WHERE fProductCode = @itemCode AND fCusCode = @fCusCode";
+                WHERE fProductCode = @itemCode AND fCusCode = @fCusCode and fid=@fid";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@itemCode", itemCode);
                         command.Parameters.AddWithValue("@fCusCode", fCusCode);
+                        command.Parameters.AddWithValue("@FID", FID);
 
                         int rowsAffected = command.ExecuteNonQuery();
 
@@ -323,6 +309,7 @@ public class Wishlist
 {
     public string ProductCode { get; set; }
     public string CusCode { get; set; }
+    public decimal FID { get; set; }
 }
 
 public class WishlistItem
@@ -335,6 +322,9 @@ public class WishlistItem
     public string Image { get; set; }
     public decimal TodayRate { get; set; }
     public decimal TotalPrice { get; set; }
+    public string FID { get; set; }
+
+
 
 }
 

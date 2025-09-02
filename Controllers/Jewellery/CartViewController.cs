@@ -63,8 +63,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                             }
                         }
 
-                        string insertQuery = "INSERT INTO cartlist (cartid, fCusid, fProductCode, Cdate) " +
-                                             "VALUES (@cartid, @cusid, @productCode, @date)";
+                        string insertQuery = "INSERT INTO cartlist (cartid, fCusid, fProductCode, Cdate,FID) " +
+                                             "VALUES (@cartid, @cusid, @productCode, @date,@FID)";
 
                         using (SqlCommand insertCommand = new SqlCommand(insertQuery, connection))
                         {
@@ -72,6 +72,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                             insertCommand.Parameters.AddWithValue("@cusid", cart.CusCode);
                             insertCommand.Parameters.AddWithValue("@productCode", cart.ProductCode);
                             insertCommand.Parameters.AddWithValue("@date", DateTime.Now);
+                            insertCommand.Parameters.AddWithValue("@FID", cart.FID);
 
                             int insertResult = await insertCommand.ExecuteNonQueryAsync();
 
@@ -131,11 +132,13 @@ namespace CHITSCHEME.Controllers.Jewellery
             }
         }
 
-
         [HttpGet]
         [Route("cartViewItem")]
         public async Task<IActionResult> GetCartItems(string fCusid)
         {
+            if (string.IsNullOrEmpty(fCusid))
+                return BadRequest(new { message = "Customer ID is required." });
+
             List<CartItem> cartItems = new List<CartItem>();
             decimal AlltotalAmount = 0;
 
@@ -146,46 +149,29 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await connection.OpenAsync();
 
                     string query = @"
-                            SELECT 
-                        C.cartid, 
-                        I.FITEMCODE,
-                    I.FPARENT,
-                    I.FITEMNAME, 
-                    I.FIMAGE, 
-                    I.fPieceRate, 
-                    I.fRate,  
-                    I.Weight, 
-                    i.NetWt,
-                    i.fGrossWt,
-                    i.LessWt,
-                    i.fVA,
-                    i.fVAGMS,
-                    i.fMc,
-                    i.fOthers,
-                    i.fTax,
-                    i.fStoneCharges,
-                    i.fimage2,
-                    i.fimage3,
-                    i.fimage4,
-                    i.fPieceRate,
-                    i.fRate,
+                SELECT 
+                    C.cartid,
+                    C.fProductCode AS fItemcode,
+                    C.fCusid,
+                    op.fParent,
+                    i.fItemName,
+                    COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
+                    op.fPieceRate,
+                    op.Gms AS NetWt,
+                    op.Gross AS fGrossWt,
+                    op.Wastage,
+                    op.McAmount AS McAmount,
+                    op.fOthers,
+                    op.fTax,
+                    op.StnChrg AS StoneCharges,
                     d.fRate AS GoldRate,
-                    I.NetWt, 
-                    i.LessWt,
-                    I.fVA, 
-                    I.fVAGMS, 
-                    I.fMc, 
-                    I.fOthers, 
-                    I.fStoneCharges, 
-                    D.fRate AS GoldRate
-                    FROM 
-                        CartList C 
-                    INNER JOIN 
-                        item11 i ON i.fItemcode = C.fProductCode
-                    INNER JOIN 
-                        Division D ON i.fPurity = d.fName
-                    WHERE 
-                        C.fCusid = @fCusid  order by c.cartid  desc";
+                    op.FID
+                FROM CartList C
+                INNER JOIN ITEMPURCHASEOP op ON op.fID = C.FID
+                LEFT JOIN Division d ON op.fDiv = d.fcode
+                JOIN item i ON i.fItemcode = op.Itemcode
+                WHERE C.fCusid = @fCusid
+                ORDER BY C.cartid DESC;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
@@ -195,45 +181,50 @@ namespace CHITSCHEME.Controllers.Jewellery
                         {
                             while (await reader.ReadAsync())
                             {
-                                string pieceRate = reader["fPieceRate"]?.ToString();
-                                decimal baseWeight = SafeGetDecimal(reader, "Weight");
+                                string piecerateFlag = reader["fPieceRate"]?.ToString();
                                 decimal netWt = SafeGetDecimal(reader, "NetWt");
-                                decimal lessWt = SafeGetDecimal(reader, "LessWt");
-                                decimal fGrossWt = SafeGetDecimal(reader, "fGrossWt");
-                                decimal fVA = SafeGetDecimal(reader, "fVA");
-                                decimal fVAGMS = SafeGetDecimal(reader, "fVAGMS");
-                                decimal fMc = SafeGetDecimal(reader, "fMc");
-                                decimal fStoneCharges = SafeGetDecimal(reader, "fStoneCharges");
-                                decimal fTax = SafeGetDecimal(reader, "fTax");
+                                decimal grossWt = SafeGetDecimal(reader, "fGrossWt");
+                                decimal wastage = SafeGetDecimal(reader, "Wastage");
+                                decimal mc = SafeGetDecimal(reader, "McAmount");
+                                decimal stoneCharges = SafeGetDecimal(reader, "StoneCharges");
                                 decimal fOthers = SafeGetDecimal(reader, "fOthers");
+                                decimal tax = SafeGetDecimal(reader, "fTax");
                                 decimal goldRate = SafeGetDecimal(reader, "GoldRate");
-                                decimal fRate = SafeGetDecimal(reader, "fRate");
 
-                                var result = PriceCalculator.CalculatePrice(pieceRate, netWt, fVA, fVAGMS, fRate, fMc, fOthers, fStoneCharges, fTax, goldRate);
-                                decimal totalAmount = result.TotalAmount;
-                                decimal taxAmount = result.TaxAmount;
+                                decimal totalAmount = 0;
+
+                                // ---------------- Price calculation ----------------
+                                if (piecerateFlag?.ToUpper() == "Y")
+                                {
+                                    totalAmount = mc + tax;
+                                }
+                                else
+                                {
+                                    var priceResult = PriceCalculator.CalculatePrice(
+                                        null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
+                                    );
+                                    totalAmount = priceResult.TotalAmount;
+                                }
+
                                 AlltotalAmount += totalAmount;
 
-                                CartItem item = new CartItem
+                                cartItems.Add(new CartItem
                                 {
                                     CartId = reader["cartid"]?.ToString() ?? "",
                                     ItemCode = reader["fItemcode"]?.ToString() ?? "",
-                                    fparent = reader["fparent"]?.ToString() ?? "",
+                                    fparent = reader["fParent"]?.ToString() ?? "",
                                     ItemName = reader["fItemName"]?.ToString() ?? "",
                                     Image = reader["fimage"]?.ToString() ?? "",
-                                    TotalPrice = totalAmount,
-                                };
-
-                                cartItems.Add(item);
+                                    FID = reader["FID"]?.ToString() ?? "",
+                                    TotalPrice = totalAmount
+                                });
                             }
                         }
                     }
                 }
 
                 if (cartItems.Count == 0)
-                {
                     return NotFound(new { message = "No items found in the cart." });
-                }
 
                 return Ok(new
                 {
@@ -241,13 +232,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                     cartItems
                 });
             }
-            catch (SqlException sqlEx)
-            {
-                return StatusCode(500, new { error = "Database error occurred.", details = sqlEx.Message });
-            }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = "An unexpected error occurred.", details = ex.Message });
+                return StatusCode(500, new { error = "An error occurred.", details = ex.Message });
             }
         }
 
@@ -263,8 +250,8 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
 
-        [HttpDelete("cartDeleteItem/{itemCode}")]
-        public IActionResult RemoveCartItem(string itemCode, [FromQuery] string fCusid)
+        [HttpDelete("cartDeleteItem/{itemCode}/{FID}")]
+        public IActionResult RemoveCartItem(string itemCode, [FromQuery] string fCusid,string FID)
         {
             try
             {
@@ -274,12 +261,13 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                     string query = @"
                 DELETE FROM CartList 
-                WHERE fProductCode = @itemCode AND fCusid = @fCusid";
+                WHERE fProductCode = @itemCode AND fCusid = @fCusid and FID = @FID";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@itemCode", itemCode);
                         command.Parameters.AddWithValue("@fCusid", fCusid);
+                        command.Parameters.AddWithValue("@FID", FID);
 
                         int rowsAffected = command.ExecuteNonQuery();
 
@@ -312,6 +300,7 @@ public class Cart
 {
     public string ProductCode { get; set; }
     public string CusCode { get; set; }
+    public string FID { get; set; }
 }
 
 public class CartItem
@@ -323,5 +312,6 @@ public class CartItem
     public string Image { get; set; }
     public decimal TodayRate { get; set; }
     public decimal TotalPrice { get; set; }
+    public string FID { get; set; }
 
 }

@@ -1,4 +1,5 @@
 ﻿using JEWELLBISREACT.DBConnection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System.Threading.Tasks;
@@ -6,6 +7,7 @@ using System.Threading.Tasks;
 namespace CHITSCHEME.Controllers.SHEME
 {
     [Route("api/[controller]")]
+    [Authorize]
     [ApiController]
     public class SchemeController : ControllerBase
     {
@@ -209,9 +211,9 @@ namespace CHITSCHEME.Controllers.SHEME
                 if (!string.IsNullOrEmpty(customer.digiType))
                 {
                     string digiUpper = customer.digiType.ToUpper();
-                    if (digiUpper=="DIGI GOLD")
+                    if (digiUpper=="DIGI GOLD" || digiUpper == "DG")
                         digiTypeValue = "DG";
-                    else if (digiUpper== "DIGI SILVER")
+                    else if (digiUpper== "DIGI SILVER" || digiUpper == "DS")
                         digiTypeValue = "DS";
 
                     if (digiTypeValue != "") // If digital scheme
@@ -241,9 +243,9 @@ namespace CHITSCHEME.Controllers.SHEME
                     cmd.Parameters.AddWithValue("@fdate", DateTime.Now);
                     cmd.Parameters.AddWithValue("@famount", customer.amount);
                     cmd.Parameters.AddWithValue("@fdue", customer.due);
-                    cmd.Parameters.AddWithValue("@fschemetype", fschemetypeValue);
+                    cmd.Parameters.AddWithValue("@fschemetype", fschemetypeValue.ToUpper());
                     cmd.Parameters.AddWithValue("@digiType", digiTypeValue);
-                    cmd.Parameters.AddWithValue("@Fdigicr", customer.digiCr ?? "");
+                    cmd.Parameters.AddWithValue("@Fdigicr", customer.digiCr.ToUpper() ?? "");
 
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -277,17 +279,17 @@ namespace CHITSCHEME.Controllers.SHEME
         {
             public string fullName { get; set; }
             public string schemeId { get; set; }
-            public string street { get; set; }
-            public string area { get; set; }
-            public string city { get; set; }
-            public string pincode { get; set; }
+            public string? street { get; set; }
+            public string? area { get; set; }
+            public string? city { get; set; }
+            public string? pincode { get; set; }
             public string phone { get; set; }
-            public string email { get; set; }
+            public string? email { get; set; }
             public string fschemetype { get; set; } // Will be overridden for digital schemes
-            public decimal amount { get; set; }
-            public decimal due { get; set; }
+            public decimal? amount { get; set; }
+            public decimal? due { get; set; }
             public string digiType { get; set; }   // Gold/Silver
-            public string digiCr { get; set; }     // optional
+            public string? digiCr { get; set; }     // optional
         }
 
 

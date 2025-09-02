@@ -10,7 +10,7 @@ using Microsoft.Extensions.Configuration;
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
-    //[Authorize]
+    [Authorize]
     [ApiController]
     public class ListItemsController : ControllerBase
     {
@@ -492,7 +492,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 op.fOthers,
                 op.McAmount,
                 d.fRate AS GoldRate,
-                op.fDate
+                op.fDate,op.fid
             FROM ITEMPURCHASEOP op
             JOIN item i ON i.fItemcode = op.Itemcode
             LEFT JOIN Division d ON d.fCode = op.fDiv
@@ -539,6 +539,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                 fparent = reader["fParent"].ToString(),
                                 Name = reader["fItemName"].ToString(),
                                 Image = reader["FinalImage"]?.ToString(),
+                                fID = reader["fid"]?.ToString(),
                                 Price = totalAmount
                             });
                         }
@@ -584,6 +585,8 @@ public class JewelleryItem
 
     [JsonPropertyName("totalPrice")]
     public decimal Price { get; set; }
+    [JsonPropertyName("fID")]
+    public string fID { get; set; }
 }
 
 
