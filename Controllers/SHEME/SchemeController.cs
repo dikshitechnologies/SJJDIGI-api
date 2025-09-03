@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace CHITSCHEME.Controllers.SHEME
@@ -21,6 +22,15 @@ namespace CHITSCHEME.Controllers.SHEME
             public string FCode { get; set; }
             public string FacName { get; set; }
             public string FParent { get; set; }
+            [JsonPropertyName("fAmount")]
+            public string FAMOUNT { get; set; }
+
+            [JsonPropertyName("fDue")]
+            public string fdue { get; set; }
+            [JsonPropertyName("fschemetype")]
+
+            public string schemeType { get; set; }
+
         }
 
         [HttpGet("SchemeList")]
@@ -35,7 +45,7 @@ namespace CHITSCHEME.Controllers.SHEME
                     await conn.OpenAsync();
 
                     string query = @"
-                        SELECT fcode, facName, fParent
+                        SELECT fcode, facName, fParent,fdue,FAMOUNT,FSCHEMETYPE
                         FROM party
                         WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2
                         ORDER BY fParent, fcode";
@@ -50,7 +60,10 @@ namespace CHITSCHEME.Controllers.SHEME
                                 {
                                     FCode = reader["fcode"]?.ToString(),
                                     FacName = reader["facName"]?.ToString(),
-                                    FParent = reader["fParent"]?.ToString()
+                                    FParent = reader["fParent"]?.ToString(),
+                                    fdue = reader["fdue"]?.ToString(),
+                                    FAMOUNT = reader["FAMOUNT"]?.ToString(),
+                                    schemeType = reader["FSCHEMETYPE"]?.ToString(),
                                 });
                             }
                         }

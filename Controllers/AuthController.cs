@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authorization;
+using static QRCoder.PayloadGenerator;
 
 namespace CHITSCHEME.Controllers
 {
@@ -39,6 +40,10 @@ namespace CHITSCHEME.Controllers
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
+                // -------- Check Party --------
+                string partyName = null;
+                string partyPhone = null;
+
                 var partyCmd = new SqlCommand(@"
             SELECT TOP 1 FACNAME, FPHONE 
             FROM Party 
@@ -47,9 +52,6 @@ namespace CHITSCHEME.Controllers
               AND fphone = @phone
             ORDER BY FCODE", connection);
                 partyCmd.Parameters.AddWithValue("@phone", request.Phone);
-
-                string partyName = null;
-                string partyPhone = null;
 
                 using (var reader = await partyCmd.ExecuteReaderAsync())
                 {
@@ -60,16 +62,32 @@ namespace CHITSCHEME.Controllers
                     }
                 }
 
+                // -------- Check RegisterUsers --------
+                string username = string.Empty;
+                string email = string.Empty;
                 int userId = 0;
-                var userCheckCmd = new SqlCommand("SELECT UserId FROM RegisterUsers WHERE PhoneNumber = @phone", connection);
-                userCheckCmd.Parameters.AddWithValue("@phone", request.Phone);
-                var result = await userCheckCmd.ExecuteScalarAsync();
-                if (result != null)
-                    userId = Convert.ToInt32(result);
 
+                var regDetailsCmd = new SqlCommand(
+                    "SELECT UserId, UserName, Email FROM RegisterUsers WHERE PhoneNumber = @phone",
+                    connection);
+                regDetailsCmd.Parameters.AddWithValue("@phone", request.Phone);
+
+                using (var reader = await regDetailsCmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        userId = Convert.ToInt32(reader["UserId"]);
+                        username = reader["UserName"].ToString();
+                        email = reader["Email"].ToString();
+                    }
+                }
+
+                // -------- If party exists but not registered, insert new user --------
                 if ((partyName != null && partyPhone != null) && userId == 0)
                 {
-                    using (var transaction = connection.BeginTransaction())
+                    using var transaction = connection.BeginTransaction();
+
+                    try
                     {
                         var getMaxIdCmd = new SqlCommand(
                             "SELECT ISNULL(MAX(UserId), 1000) + 1 FROM RegisterUsers WITH (TABLOCKX)",
@@ -78,7 +96,9 @@ namespace CHITSCHEME.Controllers
 
                         var insertCmd = new SqlCommand(@"
                     INSERT INTO RegisterUsers (UserId, UserName, PhoneNumber, Email, PasswordHash, CreatedAt)
-                    VALUES (@UserId, @UserName, @PhoneNumber, @Email, @PasswordHash, @CreatedAt)", connection, transaction);
+                    VALUES (@UserId, @UserName, @PhoneNumber, @Email, @PasswordHash, @CreatedAt)",
+                            connection, transaction);
+
                         insertCmd.Parameters.AddWithValue("@UserId", userId);
                         insertCmd.Parameters.AddWithValue("@UserName", partyName);
                         insertCmd.Parameters.AddWithValue("@PhoneNumber", partyPhone);
@@ -87,23 +107,33 @@ namespace CHITSCHEME.Controllers
                         insertCmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
 
                         await insertCmd.ExecuteNonQueryAsync();
-                        transaction.Commit();
+                        await transaction.CommitAsync();
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
                     }
 
-                    var token = JwtHelper.GenerateJwtToken(request.Phone,"User", _config);
-                    return Ok(new { token, UserPermission = "Y", UserId = userId });
-                }
-                else if ((partyName != null && partyPhone != null) && userId > 0)
-                {
-                    var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "Y", UserId = userId });
-                }
-                else if (partyName == null && userId > 0)
-                {
-                    var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "N", UserId = userId });
+                    var tokenNew = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
+                    return Ok(new { token = tokenNew, UserPermission = "Y", UserId = userId, username = partyName, email = "" });
                 }
 
+                // -------- If party exists and already registered --------
+                if ((partyName != null && partyPhone != null) && userId > 0)
+                {
+                    var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
+                    return Ok(new { token, UserPermission = "Y", UserId = userId, username, email });
+                }
+
+                // -------- If party does not exist but user is registered --------
+                if (partyName == null && userId > 0)
+                {
+                    var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
+                    return Ok(new { token, UserPermission = "N", UserId = userId, username, email });
+                }
+
+                // -------- Otherwise --------
                 return Unauthorized(new { message = "Please check the phone number." });
             }
             catch (SqlException)
