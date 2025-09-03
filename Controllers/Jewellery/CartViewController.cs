@@ -26,11 +26,12 @@ namespace CHITSCHEME.Controllers.Jewellery
                 {
                     await connection.OpenAsync();
 
-                    string checkProductQuery = "SELECT COUNT(*) FROM cartlist WHERE fCusid = @cusid AND fProductCode = @productCode";
+                    string checkProductQuery = "SELECT COUNT(*) FROM cartlist WHERE fCusid = @cusid AND fProductCode = @productCode AND FID =@FID";
                     using (SqlCommand checkCommand = new SqlCommand(checkProductQuery, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@cusid", cart.CusCode);
                         checkCommand.Parameters.AddWithValue("@productCode", cart.ProductCode);
+                        checkCommand.Parameters.AddWithValue("@FID", cart.FID);
 
                         int existingCount = (int)await checkCommand.ExecuteScalarAsync();
                         if (existingCount > 0)
@@ -165,7 +166,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     op.fTax,
                     op.StnChrg AS StoneCharges,
                     d.fRate AS GoldRate,
-                    op.FID
+                    c.FID
                 FROM CartList C
                 INNER JOIN ITEMPURCHASEOP op ON op.fID = C.FID
                 LEFT JOIN Division d ON op.fDiv = d.fcode

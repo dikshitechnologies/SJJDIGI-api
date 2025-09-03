@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using JEWELLBISREACT.DBConnection;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using JEWELLBISREACT.DBConnection;
-using Microsoft.AspNetCore.Authorization;
+using System.Data;
 
 namespace CHITSCHEME.Controllers.Jewellery
 {
@@ -13,11 +14,153 @@ namespace CHITSCHEME.Controllers.Jewellery
     [ApiController]
     public class OrderController : ControllerBase
     {
+
+
+
+
+        [HttpPost("insert-item-transaction")]
+        public async Task<IActionResult> PlaceOrderTrans([FromBody] OrderModel order)
+        {
+            if (order == null || order.Items == null || !order.Items.Any())
+                return BadRequest("Invalid order data.");
+
+            try
+            {
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    await con.OpenAsync();
+                    using (SqlTransaction tran = con.BeginTransaction())
+                    {
+                        try
+                        {
+                            // 1. Get current max FVOUCHER number
+                            string maxVoucherQuery = @"
+                                    SELECT ISNULL(MAX(CAST(SUBSTRING(FVOUCHER, 3, LEN(FVOUCHER)) AS INT)), 0) 
+                                    FROM itemtransactionop
+                                    WHERE FVOUCHER LIKE 'OD%'";
+
+                            int maxVoucher = 0;
+                            using (SqlCommand cmdMax = new SqlCommand(maxVoucherQuery, con, tran))
+                            {
+                                maxVoucher = Convert.ToInt32(await cmdMax.ExecuteScalarAsync());
+                            }
+
+                            int nextVoucher = maxVoucher+1;
+
+                            foreach (var item in order.Items)
+                            {
+                                // 2. Fetch data from itempurchaseop for given ItemCode + fid
+                                string selectQuery = @"
+                           
+
+                                    SELECT 
+                                         ip.Itemcode, 
+                                         ip.Qty AS fTotQty,
+                                         ip.Gms AS fGms,
+                                         ip.Mc AS fMcAmount,
+                                         ip.StnChrg AS fStnChrg,
+                                         ip.Wastage AS fWastage,
+                                         ip.fPrefix, 
+                                         ip.fBox, 
+                                         ip.Gross AS fGross,
+                                         ip.fSize, 
+                                         ip.fDiv, 
+                                         ip.fDescription AS fdesc,
+                                         ip.fDesign, 
+                                         ip.fSection, 
+                                         ip.fID,
+                                         d.fRate   -- include division rate
+                                    FROM itempurchaseop ip
+                                    JOIN Division d ON d.fCode = ip.fDiv
+                                    WHERE ip.Itemcode = @ItemCode AND ip.FID = @FID;
+
+
+
+                            ";
+
+                                DataTable dt = new DataTable();
+                                using (SqlCommand cmdSelect = new SqlCommand(selectQuery, con, tran))
+                                {
+                                    cmdSelect.Parameters.AddWithValue("@ItemCode", item.ItemCode);
+                                    cmdSelect.Parameters.AddWithValue("@FID", item.fid);
+
+                                    using (SqlDataAdapter da = new SqlDataAdapter(cmdSelect))
+                                    {
+                                        da.Fill(dt);
+                                    }
+                                }
+
+                                if (dt.Rows.Count == 0)
+                                    continue; // skip if no match found
+                                // 3. Insert into itemtransactionop
+                                foreach (DataRow row in dt.Rows)
+                                {
+
+                                    string insertQuery = @"
+                                        INSERT INTO itemtransactionop
+                                        (FVoucher, FItemcode, FType, fTotQty, fGms, fMcAmount, fStnChrg, fWastage, 
+                                         fPrefix, fBox, fGross, fSize, fDiv, fCode,fproductId,fRate)
+                                        VALUES
+                                        (@FVOUCHER, @FItemcode, @FTYpe, @fTotQty, @FGms, @FMcAmount, @FStnChrg, @FWastage,
+                                         @FPrefix, @FBox, @FGross, @FSize, @FDiv, @FCode,@productId,@fRate)";
+
+
+                                    using (SqlCommand cmdInsert = new SqlCommand(insertQuery, con, tran))
+                                    {
+                                        string formattedVoucher = "OD" + nextVoucher.ToString("D5"); // e.g., OD00001, OD00002
+                                        cmdInsert.Parameters.AddWithValue("@FVOUCHER", formattedVoucher);
+                                        cmdInsert.Parameters.AddWithValue("@FItemcode", row["Itemcode"].ToString());
+                                        cmdInsert.Parameters.AddWithValue("@FTYpe", "OD");
+                                        cmdInsert.Parameters.AddWithValue("@fTotQty", 1);
+                                        cmdInsert.Parameters.AddWithValue("@FGms", row["fGms"]);
+                                        cmdInsert.Parameters.AddWithValue("@FMcAmount", row["fMcAmount"]);
+                                        cmdInsert.Parameters.AddWithValue("@FStnChrg", row["fStnChrg"]);
+                                        cmdInsert.Parameters.AddWithValue("@FWastage", row["fWastage"]);
+                                        cmdInsert.Parameters.AddWithValue("@FPrefix", row["fPrefix"]);
+                                        cmdInsert.Parameters.AddWithValue("@FBox", row["fBox"]);
+                                        cmdInsert.Parameters.AddWithValue("@FGross", row["fGross"]);
+                                        cmdInsert.Parameters.AddWithValue("@FSize", row["fSize"]);
+                                        cmdInsert.Parameters.AddWithValue("@FDiv", row["fDiv"]);
+                                        cmdInsert.Parameters.AddWithValue("@FCode", item.ItemCode);
+                                        cmdInsert.Parameters.AddWithValue("@productId", item.fid);
+                                        cmdInsert.Parameters.AddWithValue("@fRate", row["fRate"]);
+
+
+                                        await cmdInsert.ExecuteNonQueryAsync();
+                                    }
+
+                                }
+                            }
+
+                            tran.Commit();
+                            return Ok(new { Message = "Order placed successfully." });
+                        }
+                        catch (Exception ex)
+                        {
+                            tran.Rollback();
+                            return StatusCode(500, $"Error placing order: {ex.Message}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Database error: {ex.Message}");
+            }
+        }
+
+
+
+
+
         [HttpPost("placeOrder")] 
         public async Task<IActionResult> PlaceOrder([FromBody] OrderModel order)
         {
             if (order == null || order.Items == null || !order.Items.Any())
                 return BadRequest("Invalid order data.");
+
+
+
 
             using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
             {
@@ -154,5 +297,6 @@ public class OrderItemModel
 {
     public string ItemCode { get; set; }
     public int Quantity { get; set; }
-    public decimal Price { get; set; }
+    public string fid { get; set; }
+    public string Price { get; set; }
 }

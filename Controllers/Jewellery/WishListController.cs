@@ -27,11 +27,12 @@ namespace CHITSCHEME.Controllers.Jewellery
                 {
                     await connection.OpenAsync();
 
-                    string checkProductQuery = "SELECT COUNT(*) FROM Wishlist WHERE fCusCode = @fCusCode AND fProductCode = @productCode";
+                    string checkProductQuery = "SELECT COUNT(*) FROM Wishlist WHERE fCusCode = @fCusCode AND fProductCode = @productCode AND FID = @FID";
                     using (SqlCommand checkCommand = new SqlCommand(checkProductQuery, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@fCusCode", wishlist.CusCode);
                         checkCommand.Parameters.AddWithValue("@productCode", wishlist.ProductCode);
+                        checkCommand.Parameters.AddWithValue("@FID", wishlist.FID);
 
                         int existingCount = (int)await checkCommand.ExecuteScalarAsync();
                         if (existingCount > 0)
@@ -135,7 +136,6 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
 
-
         [HttpGet]
         [Route("WishlistViewItem")]
         public async Task<IActionResult> GetWishlistItems(string fCusCode)
@@ -154,33 +154,28 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                     string query = @"
                 SELECT 
-                W.fWishlistId AS CartId,
-                W.fProductCode AS fItemcode,
-                W.fCusCode,
-                op.fParent,
-                i.fItemName,
-                COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
-                op.fPieceRate,
-                op.Gms AS NetWt,
-                op.Gross AS fGrossWt,
-                op.Wastage,
-                op.McAmount,
-                op.fOthers,
-                op.fTax,
-                op.StnChrg AS StoneCharges,
-                d.fRate AS GoldRate,
-                op.FID
-            FROM Wishlist W
-            JOIN (
-                SELECT Itemcode, MAX(fID) AS LastFID
-                FROM ITEMPURCHASEOP
-                GROUP BY Itemcode
-            ) latest ON W.fProductCode = latest.Itemcode
-            JOIN ITEMPURCHASEOP op ON op.fID = latest.LastFID
-            LEFT JOIN Division d ON op.fDiv = d.fcode
-            JOIN item i ON W.fProductCode = i.fItemcode
-            WHERE W.fCusCode = fCusCode
-            ORDER BY W.fWishlistId DESC;";
+                    W.fWishlistId AS CartId,
+                    W.fProductCode AS fItemcode,
+                    W.fCusCode,
+                    op.fParent,
+                    i.fItemName,
+                    COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
+                    op.fPieceRate,
+                    op.Gms AS NetWt,
+                    op.Gross AS fGrossWt,
+                    op.Wastage,
+                    op.McAmount,
+                    op.fOthers,
+                    op.fTax,
+                    op.StnChrg AS StoneCharges,
+                    d.fRate AS GoldRate,
+                    op.fid
+                FROM Wishlist W
+                INNER JOIN ITEMPURCHASEOP op ON op.fID = W.FID   -- exact row per wishlist entry
+                LEFT JOIN Division d ON op.fDiv = d.fcode
+                JOIN item i ON W.fProductCode = i.fItemcode
+                WHERE W.fCusCode = @fCusCode
+                ORDER BY W.fWishlistId DESC;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
@@ -247,10 +242,6 @@ namespace CHITSCHEME.Controllers.Jewellery
                 return StatusCode(500, new { error = "An error occurred.", details = ex.Message });
             }
         }
-
-
-
-
 
         private decimal SafeGetDecimal(SqlDataReader reader, string columnName)
         {

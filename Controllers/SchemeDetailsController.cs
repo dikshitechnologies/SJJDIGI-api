@@ -305,7 +305,7 @@ namespace CHITSCHEME.Controllers
                 await connection.OpenAsync();
 
                 // ✅ 1. Fetch Division Names (this already gives you 22K & 24K rates)
-                var divisionQuery = "SELECT fcode, fName, frate FROM Division WHERE fcode IN ('0003','0004')";
+                var divisionQuery = "SELECT fcode, fName, frate FROM Division WHERE fcode IN ('0003','0004','0005')";
                 var divisionNames = new List<object>();
 
                 using (var divCmd = new SqlCommand(divisionQuery, connection))

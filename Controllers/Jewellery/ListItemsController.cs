@@ -60,7 +60,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 FROM ITEMPURCHASEOP op
                 JOIN item i ON i.fItemcode = op.Itemcode
                 LEFT JOIN Division d ON d.FCODE = op.fDiv
-                LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode
+                LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode AND w.fid = op.fid 
                 WHERE op.Itemcode = @itemCode
                 ORDER BY op.fDate DESC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
@@ -272,7 +272,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 FROM ITEMPURCHASEOP op
                 JOIN item i ON i.fItemcode = op.Itemcode
                 LEFT JOIN Division d ON d.FCODE = op.fDiv
-                LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode
+                LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode   AND w.fid = op.fid 
                 WHERE op.Itemcode = @itemCode
                     AND (@fID = '' OR op.fid = @fID)
                 ORDER BY op.fDate DESC
