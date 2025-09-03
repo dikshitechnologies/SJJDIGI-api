@@ -215,6 +215,10 @@ namespace CHITSCHEME.Controllers.SHEME
                         digiTypeValue = "DG";
                     else if (digiUpper== "DIGI SILVER" || digiUpper == "DS")
                         digiTypeValue = "DS";
+                    else if (digiUpper == "CH" || digiUpper == "ch")
+                        digiTypeValue = "CH";
+                    else
+                        return BadRequest(new { message = "Invalid digiType. Use 'DG', 'DS', 'Digi Gold', 'Digi Silver', 'None' or 'NA'." });
 
                     if (digiTypeValue != "") // If digital scheme
                         fschemetypeValue = "W"; // Override fschemetype for digital schemes
