@@ -305,17 +305,21 @@ namespace CHITSCHEME.Controllers.Jewellery
                                 decimal goldRate = SafeGetDecimal(reader, "GoldRate");
 
                                 decimal totalAmount = 0;
-
+                                decimal taxAmount = 0;
                                 // Price calculation
                                 if (piecerateFlag?.ToUpper() == "Y")
                                 {
-                                    totalAmount = mcAmount + tax;
+                                    totalAmount = mcAmount + tax;  
+                                    taxAmount = 0;                
                                 }
                                 else
                                 {
-                                    totalAmount = PriceCalculator.CalculatePrice(
-                                    null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
-                                ).TotalAmount;
+                                    var priceResult = PriceCalculator.CalculatePrice(
+                                        piecerateFlag, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
+                                    );
+
+                                    totalAmount = priceResult.TotalAmount;
+                                    taxAmount = priceResult.TaxAmount;
                                 }
 
                                 ItemsList.Add(new
@@ -331,6 +335,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     fOthers = fOthers,
                                     McAmount = mcAmount,
                                     fTax = tax,
+                                    TaxAmount = taxAmount,
                                     GoldRate = goldRate,
                                     TotalAmount = totalAmount,
                                     fimage = reader["fimage"]?.ToString() ?? string.Empty,
