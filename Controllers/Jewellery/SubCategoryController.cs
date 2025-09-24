@@ -8,7 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = "Guest,User,Admin")]
     [ApiController]
     public class SubCategoryController : ControllerBase
     {

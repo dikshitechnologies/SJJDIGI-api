@@ -10,7 +10,7 @@ using Microsoft.Extensions.Configuration;
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = "Guest,User,Admin")]
     [ApiController]
     public class ListItemsController : ControllerBase
     {

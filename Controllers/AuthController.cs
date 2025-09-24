@@ -210,6 +210,33 @@ namespace CHITSCHEME.Controllers
             }
         }
 
+        [AllowAnonymous]
+        [HttpPost("guest-login")]
+        public IActionResult GuestLogin()
+        {
+            try
+            {
+                // Generate a random GuestId
+                string guestId = Guid.NewGuid().ToString("N").Substring(0, 10);
+
+                // Generate JWT token with Guest role
+                var token = JwtHelper.GenerateJwtToken(guestId, "Guest", _config);
+
+                return Ok(new
+                {
+                    role = "Guest",
+                    token,
+                    UserPermission = "G",
+                    GuestId = guestId,
+                    username = "Guest User",
+                    email = ""
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error creating guest login.", error = ex.Message });
+            }
+        }
 
 
 

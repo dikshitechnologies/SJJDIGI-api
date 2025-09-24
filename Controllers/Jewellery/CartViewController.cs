@@ -8,7 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = "User,Admin")]
     [ApiController]
     public class CartViewController : ControllerBase
     {
