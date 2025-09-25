@@ -3,12 +3,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using System.ComponentModel.DataAnnotations;
 
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
-    [Authorize]
+    //[Authorize]
     [ApiController]
     public class ProfileController : ControllerBase
     {
@@ -160,6 +161,45 @@ namespace CHITSCHEME.Controllers.Jewellery
             }
         }
 
+
+        [HttpDelete("AccountDelete{userid}")]
+        public async Task<IActionResult> DeleteUser(string userid)
+        {
+            if (string.IsNullOrWhiteSpace(userid))
+                return BadRequest( new {message = "UserId is required." });
+
+            try
+            {
+                string connectionString = DBHelper.GetConnection();
+
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    string query = "DELETE FROM registerusers WHERE userid = @userid";
+
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@userid", userid);
+
+                        int rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+                        if (rowsAffected > 0)
+                        {
+                            return Ok(new { message = "User deleted successfully." });
+                        }
+                        else
+                        {
+                            return NotFound(new { message = "User not found." });
+                        }
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                return StatusCode(500, new { message = "Database error.", error = ex.Message });
+            }
+        }
 
     }
 }
