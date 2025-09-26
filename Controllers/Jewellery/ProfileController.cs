@@ -1,4 +1,5 @@
-﻿using JEWELLBISREACT.DBConnection;
+﻿using CHITSCHEME.Helpers;
+using JEWELLBISREACT.DBConnection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,7 @@ using System.ComponentModel.DataAnnotations;
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
-    //[Authorize]
+    [Authorize]
     [ApiController]
     public class ProfileController : ControllerBase
     {
@@ -163,10 +164,23 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
         [HttpDelete("AccountDelete{userid}")]
-        public async Task<IActionResult> DeleteUser(string userid)
+        public async Task<IActionResult> DeleteUser([FromHeader] string authorization, string userid)
         {
+            if (string.IsNullOrEmpty(authorization) || !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                return Unauthorized(new { message = "Authorization header is missing or invalid." });
+            }
+
+            var token = authorization.Substring("Bearer ".Length).Trim();
+            var phone = JwtHelper.GetPhoneFromJwtToken(token);
+
+            if (string.IsNullOrEmpty(phone))
+            {
+                return Unauthorized(new { message = "Invalid token." });
+            }
+
             if (string.IsNullOrWhiteSpace(userid))
-                return BadRequest( new {message = "UserId is required." });
+                return BadRequest(new { message = "UserId is required." });
 
             try
             {
@@ -176,9 +190,30 @@ namespace CHITSCHEME.Controllers.Jewellery
                 {
                     await conn.OpenAsync();
 
-                    string query = "DELETE FROM registerusers WHERE userid = @userid";
+                    string checkQuery = @"
+                SELECT TOP 1 1
+                FROM PARTY P
+                LEFT JOIN PARTY PARENT 
+                    ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+                WHERE P.FPHONE = @phone
+                  AND P.FPARENT LIKE '0000100044%'";
 
-                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    using (SqlCommand checkCmd = new SqlCommand(checkQuery, conn))
+                    {
+                        checkCmd.Parameters.AddWithValue("@phone", phone);
+
+                        var exists = await checkCmd.ExecuteScalarAsync();
+
+                        if (exists != null) 
+                        {
+                            return BadRequest(new { message = "Account cannot be deleted because it is linked to an active scheme." });
+                        }
+                    }
+
+                    // 2. If not part of scheme → delete
+                    string deleteQuery = "DELETE FROM registerusers WHERE userid = @userid";
+
+                    using (SqlCommand cmd = new SqlCommand(deleteQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@userid", userid);
 
@@ -200,6 +235,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 return StatusCode(500, new { message = "Database error.", error = ex.Message });
             }
         }
+
 
     }
 }
