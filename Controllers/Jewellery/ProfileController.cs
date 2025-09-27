@@ -204,28 +204,54 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                         var exists = await checkCmd.ExecuteScalarAsync();
 
-                        if (exists != null) 
+                        if (exists != null)
                         {
                             return BadRequest(new { message = "Account cannot be deleted because it is linked to an active scheme." });
                         }
                     }
 
-                    // 2. If not part of scheme → delete
-                    string deleteQuery = "DELETE FROM registerusers WHERE userid = @userid";
-
-                    using (SqlCommand cmd = new SqlCommand(deleteQuery, conn))
+                    using (SqlTransaction transaction = conn.BeginTransaction())
                     {
-                        cmd.Parameters.AddWithValue("@userid", userid);
-
-                        int rowsAffected = await cmd.ExecuteNonQueryAsync();
-
-                        if (rowsAffected > 0)
+                        try
                         {
-                            return Ok(new { message = "User deleted successfully." });
+                            string deleteCartQuery = "DELETE FROM cartlist WHERE fCusid = @userid";
+                            using (SqlCommand cmd = new SqlCommand(deleteCartQuery, conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@userid", userid);
+                                await cmd.ExecuteNonQueryAsync();
+                            }
+
+                            string deleteWishlistQuery = "DELETE FROM Wishlist WHERE fCusCode = @userid";
+                            using (SqlCommand cmd = new SqlCommand(deleteWishlistQuery, conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@userid", userid);
+                                await cmd.ExecuteNonQueryAsync();
+                            }
+
+                            string deleteUserQuery = "DELETE FROM registerusers WHERE userid = @userid";
+                            int rowsAffected;
+                            using (SqlCommand cmd = new SqlCommand(deleteUserQuery, conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@userid", userid);
+                                rowsAffected = await cmd.ExecuteNonQueryAsync();
+                            }
+
+                            if (rowsAffected > 0)
+                            {
+
+                                transaction.Commit();
+                                return Ok(new { message = "Your account Has been Deleted Success!.." });
+                            }
+                            else
+                            {
+                                transaction.Rollback();
+                                return NotFound(new { message = "User not found." });
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            return NotFound(new { message = "User not found." });
+                            transaction.Rollback();
+                            return StatusCode(500, new { message = "Error while deleting user.", error = ex.Message });
                         }
                     }
                 }
@@ -235,7 +261,6 @@ namespace CHITSCHEME.Controllers.Jewellery
                 return StatusCode(500, new { message = "Database error.", error = ex.Message });
             }
         }
-
 
     }
 }
