@@ -1,4 +1,5 @@
-﻿using System.Data;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Data;
 using JEWELLBISREACT.DBConnection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,11 @@ namespace CHITSCHEME.Controllers
     [ApiController]
     public class PaymentDetailsController : ControllerBase
     {
+
+
+
+        //-----------------------------------------------------------payment  details ------------------------------------
+
         [HttpPost("paymentDetails")]
         public IActionResult AddPayment([FromBody] PaymentDetailsModel payment)
         {
@@ -72,8 +78,9 @@ namespace CHITSCHEME.Controllers
 
 
 
-    
 
+
+        //-----------------------------------------------------------admin details ------------------------------------
 
         [HttpGet("GetPaymentDetails")]
         public IActionResult GetPaymentDetails(
@@ -200,42 +207,271 @@ namespace CHITSCHEME.Controllers
         }
 
 
-        //[HttpDelete("DeletePaymentDetails/{id}")]
-        //public IActionResult DeletePaymentDetails(int id)
-        //{
-        //    try
-        //    {
-        //        if (id <= 0)
-        //            return BadRequest(new { Message = "Invalid ID" });
 
-        //        string query = "DELETE FROM PaymentDetails WHERE Id = @Id";
 
-        //        int rowsAffected = 0;
+        //-----------------------------------------------------------customer details ------------------------------------
 
-        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+
+        //        [HttpGet("GetCustomerPaymentDetails")]
+        //        public IActionResult GetCustomerPaymentDetails(
+        //   [FromQuery] int pageNumber = 1,
+        //    [FromQuery] int pageSize = 10,
+        //    [FromQuery] DateTime? fromDate = null,
+        //    [FromQuery] DateTime? toDate = null,
+        //    [FromQuery][Required] string customercode = null, // ✅ required
+        //    [FromQuery] string flag = "N"
+        //)
         //        {
-        //            using (SqlCommand cmd = new SqlCommand(query, con))
+        //            try
         //            {
-        //                cmd.Parameters.AddWithValue("@Id", id);
-        //                con.Open();
-        //                rowsAffected = cmd.ExecuteNonQuery();
+
+        //                if (string.IsNullOrWhiteSpace(customercode))
+        //                {
+        //                    return BadRequest(new { Message = "Customer name is required to fetch payment details." });
+        //                }
+        //                if (pageNumber < 1) pageNumber = 1;
+        //                if (pageSize < 1) pageSize = 10;
+
+        //                int offset = (pageNumber - 1) * pageSize;
+
+        //                // ✅ Base query
+        //                string query = @"
+        //            SELECT 
+        //                P.Id,
+        //                P.FDate,
+        //                P.FcusCode,
+        //                CusParty.fAcname AS CustomerName,
+        //                P.FWeight,
+        //                P.FAmount,
+        //                P.flag
+        //            FROM PaymentDetails P
+        //            LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
+        //            WHERE 1=1
+        //        ";
+
+        //                // ✅ Dynamic flag filter
+        //                if (!string.IsNullOrEmpty(flag))
+        //                    query += " AND P.flag = @Flag";
+
+        //                // ✅ Other filters
+        //                if (fromDate.HasValue)
+        //                    query += " AND CAST(P.FDate AS DATE) >= @FromDate";
+        //                if (toDate.HasValue)
+        //                    query += " AND CAST(P.FDate AS DATE) <= @ToDate";
+        //                if (!string.IsNullOrEmpty(customercode))
+        //                    query += " AND CusParty.fAcname LIKE '%' + @FcusCode + '%'";
+
+        //                // ✅ Pagination
+        //                query += @"
+        //            ORDER BY P.Id DESC
+        //            OFFSET @Offset ROWS
+        //            FETCH NEXT @PageSize ROWS ONLY;
+
+        //            -- Count query
+        //            SELECT COUNT(*) AS TotalRecords
+        //            FROM PaymentDetails P
+        //            LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
+        //            WHERE 1=1
+        //        ";
+
+        //                // ✅ Repeat filters for count
+        //                if (!string.IsNullOrEmpty(flag))
+        //                    query += " AND P.flag = @Flag";
+        //                if (fromDate.HasValue)
+        //                    query += " AND CAST(P.FDate AS DATE) >= @FromDate";
+        //                if (toDate.HasValue)
+        //                    query += " AND CAST(P.FDate AS DATE) <= @ToDate";
+        //                if (!string.IsNullOrEmpty(customercode))
+        //                    query += " AND CusParty.fAcname LIKE '%' + @FcusCode + '%'";
+
+        //                DataSet ds = new DataSet();
+        //                int totalRecords = 0;
+
+        //                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+        //                {
+        //                    using (SqlCommand cmd = new SqlCommand(query, con))
+        //                    {
+        //                        cmd.Parameters.AddWithValue("@Offset", offset);
+        //                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
+        //                        cmd.Parameters.AddWithValue("@Flag", flag); // ✅ Added flag parameter
+
+        //                        if (fromDate.HasValue)
+        //                            cmd.Parameters.AddWithValue("@FromDate", fromDate.Value);
+        //                        if (toDate.HasValue)
+        //                            cmd.Parameters.AddWithValue("@ToDate", toDate.Value);
+        //                        if (!string.IsNullOrEmpty(customercode))
+        //                            cmd.Parameters.AddWithValue("@FcusCode", customercode);
+
+        //                        using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+        //                        {
+        //                            adapter.Fill(ds);
+        //                        }
+        //                    }
+        //                }
+
+        //                DataTable table = ds.Tables[0];
+        //                if (ds.Tables.Count > 1 && ds.Tables[1].Rows.Count > 0)
+        //                    totalRecords = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalRecords"]);
+
+        //                var dataList = new List<Dictionary<string, object>>();
+        //                foreach (DataRow row in table.Rows)
+        //                {
+        //                    var dict = new Dictionary<string, object>();
+        //                    foreach (DataColumn col in table.Columns)
+        //                    {
+        //                        dict[col.ColumnName] = row[col];
+        //                    }
+        //                    dataList.Add(dict);
+        //                }
+
+        //                return Ok(new
+        //                {
+        //                    PageNumber = pageNumber,
+        //                    PageSize = pageSize,
+        //                    TotalRecords = totalRecords,
+        //                    TotalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
+        //                    FlagFilter = flag, // ✅ Added for clarity
+        //                    Data = dataList
+        //                });
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                return BadRequest(new { Message = "Error retrieving customer data", Error = ex.Message });
         //            }
         //        }
 
-        //        if (rowsAffected > 0)
-        //        {
-        //            return Ok(new { Message = "Payment record deleted successfully.", DeletedId = id });
-        //        }
-        //        else
-        //        {
-        //            return NotFound(new { Message = "Payment record not found." });
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(new { Message = "Error deleting record", Error = ex.Message });
-        //    }
-        //}
+
+
+
+        [HttpGet("GetCustomerPaymentDetails")]
+        public IActionResult GetCustomerPaymentDetails(
+    [FromQuery] int pageNumber = 1,
+    [FromQuery] int pageSize = 10,
+    [FromQuery] DateTime? fromDate = null,
+    [FromQuery] DateTime? toDate = null,
+    [FromQuery][Required] string customercode = null, // ✅ Required parameter
+    [FromQuery] string flag = "N"
+)
+        {
+            try
+            {
+                // ✅ Validate required parameter
+                if (string.IsNullOrWhiteSpace(customercode))
+                {
+                    return BadRequest(new { Message = "Customer code is required to fetch payment details." });
+                }
+
+                if (pageNumber < 1) pageNumber = 1;
+                if (pageSize < 1) pageSize = 10;
+
+                int offset = (pageNumber - 1) * pageSize;
+
+                // ✅ Base query
+                string query = @"
+            SELECT 
+                P.Id,
+                P.FDate,
+                P.FchitCode,
+                P.FcusCode,
+                CusParty.fAcname AS CustomerName,
+                P.FWeight,
+                P.FAmount,
+                P.flag
+            FROM PaymentDetails P
+            LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
+            WHERE 1=1
+        ";
+
+                // ✅ Add filters dynamically
+                query += " AND P.FcusCode = @FcusCode"; // ← Filter by exact customer code
+
+                if (!string.IsNullOrEmpty(flag))
+                    query += " AND P.flag = @Flag";
+                if (fromDate.HasValue)
+                    query += " AND CAST(P.FDate AS DATE) >= @FromDate";
+                if (toDate.HasValue)
+                    query += " AND CAST(P.FDate AS DATE) <= @ToDate";
+
+                // ✅ Pagination query
+                query += @"
+            ORDER BY P.Id DESC
+            OFFSET @Offset ROWS
+            FETCH NEXT @PageSize ROWS ONLY;
+
+            -- Count query
+            SELECT COUNT(*) AS TotalRecords
+            FROM PaymentDetails P
+            LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
+            WHERE P.FcusCode = @FcusCode
+        ";
+
+                if (!string.IsNullOrEmpty(flag))
+                    query += " AND P.flag = @Flag";
+                if (fromDate.HasValue)
+                    query += " AND CAST(P.FDate AS DATE) >= @FromDate";
+                if (toDate.HasValue)
+                    query += " AND CAST(P.FDate AS DATE) <= @ToDate";
+
+                // ✅ Execute query
+                DataSet ds = new DataSet();
+                int totalRecords = 0;
+
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@FcusCode", customercode);
+                        cmd.Parameters.AddWithValue("@Offset", offset);
+                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
+                        cmd.Parameters.AddWithValue("@Flag", flag);
+
+                        if (fromDate.HasValue)
+                            cmd.Parameters.AddWithValue("@FromDate", fromDate.Value);
+                        if (toDate.HasValue)
+                            cmd.Parameters.AddWithValue("@ToDate", toDate.Value);
+
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                        {
+                            adapter.Fill(ds);
+                        }
+                    }
+                }
+
+                // ✅ Parse results
+                DataTable table = ds.Tables[0];
+                if (ds.Tables.Count > 1 && ds.Tables[1].Rows.Count > 0)
+                    totalRecords = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalRecords"]);
+
+                var dataList = new List<Dictionary<string, object>>();
+                foreach (DataRow row in table.Rows)
+                {
+                    var dict = new Dictionary<string, object>();
+                    foreach (DataColumn col in table.Columns)
+                        dict[col.ColumnName] = row[col];
+                    dataList.Add(dict);
+                }
+
+                // ✅ Return formatted response
+                return Ok(new
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
+                    CustomerCode = customercode,
+                    FlagFilter = flag,
+                    Data = dataList
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Error retrieving customer payment details", Error = ex.Message });
+            }
+        }
+
+
+        //-----------------------------------------------------------customer  delete details ------------------------------------
+
 
         [HttpDelete("DeletePaymentDetails")]
         public IActionResult DeletePaymentDetails([FromBody] List<int> ids)
@@ -287,53 +523,8 @@ namespace CHITSCHEME.Controllers
 
 
 
-        //[HttpPut("UpdatePaymentDetails")]
-        //public IActionResult UpdatePaymentDetails([FromBody] PaymentDetails payment)
-        //{
-        //    try
-        //    {
-        //        if (payment == null || payment.Id <= 0)
-        //            return BadRequest(new { Message = "Invalid payment data or ID." });
+        //-----------------------------------------------------------update  details ------------------------------------
 
-        //        string query = @"
-        //    UPDATE PaymentDetails
-        //    SET 
-        //        FDate = ISNULL(@FDate, GETDATE()),
-        //        FchitCode = @FchitCode,
-        //        FcusCode = @FcusCode,
-        //        fAmount = @fAmount,
-        //        FWeight = @FWeight,
-        //        flag=@flag,
-        //    WHERE Id = @Id;
-        //";
-
-        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-        //        {
-        //            using (SqlCommand cmd = new SqlCommand(query, con))
-        //            {
-        //                cmd.Parameters.AddWithValue("@Id", payment.Id);
-        //                cmd.Parameters.AddWithValue("@FDate", DateTime.Now);
-        //                cmd.Parameters.AddWithValue("@FchitCode", (object?)payment.FchitCode ?? DBNull.Value);
-        //                cmd.Parameters.AddWithValue("@FcusCode", (object?)payment.FcusCode ?? DBNull.Value);
-        //                cmd.Parameters.AddWithValue("@fAmount", payment.fAmount);
-        //                cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
-        //                cmd.Parameters.AddWithValue("@flag", "Y");
-
-        //                con.Open();
-        //                int rows = cmd.ExecuteNonQuery();
-
-        //                if (rows > 0)
-        //                    return Ok(new { Message = "Payment details updated successfully." });
-        //                else
-        //                    return NotFound(new { Message = "Payment record not found." });
-        //            }
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(new { Message = "Error updating payment details", Error = ex.Message });
-        //    }
-        //}
 
         [HttpPut("UpdatePaymentDetails")]
         public IActionResult UpdatePaymentDetails([FromBody] List<PaymentDetails> payments)
@@ -358,10 +549,7 @@ namespace CHITSCHEME.Controllers
                     UPDATE PaymentDetails
                     SET 
                         FDate = ISNULL(@FDate, GETDATE()),
-                        FchitCode = @FchitCode,
-                        FcusCode = @FcusCode,
-                        fAmount = @fAmount,
-                        FWeight = @FWeight,
+                      
                         Flag = @Flag
                     WHERE Id = @Id;
                 ";
@@ -370,10 +558,6 @@ namespace CHITSCHEME.Controllers
                         {
                             cmd.Parameters.AddWithValue("@Id", payment.Id);
                             cmd.Parameters.AddWithValue("@FDate", DateTime.Now );
-                            cmd.Parameters.AddWithValue("@FchitCode", (object?)payment.FchitCode ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@FcusCode", (object?)payment.FcusCode ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@fAmount", payment.fAmount);
-                            cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
                             cmd.Parameters.AddWithValue("@Flag", "Y");
 
                             updatedCount += cmd.ExecuteNonQuery();
@@ -404,20 +588,20 @@ namespace CHITSCHEME.Controllers
         {
             public int Id { get; set; }
 
-            // Nullable — if not provided, backend will use current date
-            //public DateTime? FDate { get; set; }
+            //// Nullable — if not provided, backend will use current date
+            ////public DateTime? FDate { get; set; }
 
-            // Chit code (like scheme or plan)
-            public string FchitCode { get; set; }
+            //// Chit code (like scheme or plan)
+            //public string FchitCode { get; set; }
 
-            // Customer code (linked to Party table)
-            public string FcusCode { get; set; }
+            //// Customer code (linked to Party table)
+            //public string FcusCode { get; set; }
 
-            // Amount of payment
-            public decimal fAmount { get; set; }
+            //// Amount of payment
+            //public decimal fAmount { get; set; }
 
-            // Weight (optional, depending on your business logic)
-            public decimal FWeight { get; set; }
+            //// Weight (optional, depending on your business logic)
+            //public decimal FWeight { get; set; }
         }
 
 
