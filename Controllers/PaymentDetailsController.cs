@@ -46,8 +46,8 @@ namespace CHITSCHEME.Controllers
                 }
 
                 // ✅ Step 2: Insert record (only if no duplicate found)
-                string insertQuery = @"INSERT INTO PaymentDetails (FDate, FchitCode, FcusCode, FWeight, FAmount)
-                               VALUES (@FDate, @FchitCode, @FcusCode, @FWeight, @FAmount)";
+                string insertQuery = @"INSERT INTO PaymentDetails (FDate, FchitCode, FcusCode, FWeight, FAmount,flag)
+                               VALUES (@FDate, @FchitCode, @FcusCode, @FWeight, @FAmount,@flag)";
 
                 using (SqlCommand cmd = new SqlCommand(insertQuery, con))
                 {
@@ -56,6 +56,7 @@ namespace CHITSCHEME.Controllers
                     cmd.Parameters.AddWithValue("@FcusCode", payment.FcusCode);
                     cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
                     cmd.Parameters.AddWithValue("@FAmount", payment.FAmount);
+                    cmd.Parameters.AddWithValue("@flag", "N");
                     cmd.ExecuteNonQuery();
                 }
 
@@ -71,83 +72,7 @@ namespace CHITSCHEME.Controllers
 
 
 
-        //[HttpGet("GetPaymentDetails")]
-        //public IActionResult GetPaymentDetails(int pageNumber = 1, int pageSize = 10)
-        //{
-        //    try
-        //    {
-        //        if (pageNumber < 1) pageNumber = 1;
-        //        if (pageSize < 1) pageSize = 10;
-
-        //        int offset = (pageNumber - 1) * pageSize;
-        //        string query = @"
-        //    SELECT 
-        //        P.Id,
-        //        P.FDate,
-        //        P.FchitCode,
-        //        ChitParty.fAcname AS ChitName,
-        //        P.FcusCode,
-        //        CusParty.fAcname AS CustomerName,
-        //        P.FWeight,
-        //        P.FAmount
-        //    FROM PaymentDetails P
-        //    LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
-        //    LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-        //    ORDER BY P.Id DESC
-        //    OFFSET @Offset ROWS
-        //    FETCH NEXT @PageSize ROWS ONLY;
-
-        //    SELECT COUNT(*) AS TotalRecords FROM PaymentDetails;
-        //"
-        //        ;
-
-        //        DataSet ds = new DataSet();
-        //        int totalRecords = 0;
-
-        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-        //        {
-        //            using (SqlCommand cmd = new SqlCommand(query, con))
-        //            {
-        //                cmd.Parameters.AddWithValue("@Offset", offset);
-        //                cmd.Parameters.AddWithValue("@PageSize", pageSize);
-
-        //                using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
-        //                {
-        //                    adapter.Fill(ds);
-        //                }
-        //            }
-        //        }
-
-        //        DataTable table = ds.Tables[0];
-        //        if (ds.Tables.Count > 1 && ds.Tables[1].Rows.Count > 0)
-        //            totalRecords = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalRecords"]);
-
-        //        // ✅ Convert DataTable → List<Dictionary<string, object>>
-        //        var dataList = new List<Dictionary<string, object>>();
-        //        foreach (DataRow row in table.Rows)
-        //        {
-        //            var dict = new Dictionary<string, object>();
-        //            foreach (DataColumn col in table.Columns)
-        //            {
-        //                dict[col.ColumnName] = row[col];
-        //            }
-        //            dataList.Add(dict);
-        //        }
-
-        //        return Ok(new
-        //        {
-        //            PageNumber = pageNumber,
-        //            PageSize = pageSize,
-        //            TotalRecords = totalRecords,
-        //            TotalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
-        //            Data = dataList
-        //        });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(new { Message = "Error retrieving data", Error = ex.Message });
-        //    }
-        //}
+    
 
 
         [HttpGet("GetPaymentDetails")]
@@ -176,11 +101,12 @@ namespace CHITSCHEME.Controllers
             P.FcusCode,
             CusParty.fAcname AS CustomerName,
             P.FWeight,
-            P.FAmount
+            P.FAmount,
+            p.flag
         FROM PaymentDetails P
         LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
         LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-        WHERE 1=1
+        WHERE 1=1  and p.flag='N'
         ";
 
                 // ✅ Add filters dynamically
@@ -274,61 +200,100 @@ namespace CHITSCHEME.Controllers
         }
 
 
+        [HttpDelete("DeletePaymentDetails/{id}")]
+        public IActionResult DeletePaymentDetails(int id)
+        {
+            try
+            {
+                if (id <= 0)
+                    return BadRequest(new { Message = "Invalid ID" });
+
+                string query = "DELETE FROM PaymentDetails WHERE Id = @Id";
+
+                int rowsAffected = 0;
+
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@Id", id);
+                        con.Open();
+                        rowsAffected = cmd.ExecuteNonQuery();
+                    }
+                }
+
+                if (rowsAffected > 0)
+                {
+                    return Ok(new { Message = "Payment record deleted successfully.", DeletedId = id });
+                }
+                else
+                {
+                    return NotFound(new { Message = "Payment record not found." });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Error deleting record", Error = ex.Message });
+            }
+        }
 
 
 
-        //[HttpPut("UpdatePaymentDetails")]
-        //public IActionResult UpdatePaymentDetails([FromBody] PaymentDetails payment)
-        //{
-        //    try
-        //    {
-        //        if (payment == null || payment.Id <= 0)
-        //            return BadRequest(new { Message = "Invalid payment data or ID." });
 
-        //        string query = @"
-        //    UPDATE PaymentDetails
-        //    SET 
-        //        FDate = ISNULL(@FDate, GETDATE()),
-        //        FchitCode = @FchitCode,
-        //        FcusCode = @FcusCode,
-        //        fAmount = @fAmount,
-        //        FWeight = @FWeight
-        //    WHERE Id = @Id;
-        //";
+        [HttpPut("UpdatePaymentDetails")]
+        public IActionResult UpdatePaymentDetails([FromBody] PaymentDetails payment)
+        {
+            try
+            {
+                if (payment == null || payment.Id <= 0)
+                    return BadRequest(new { Message = "Invalid payment data or ID." });
 
-        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-        //        {
-        //            using (SqlCommand cmd = new SqlCommand(query, con))
-        //            {
-        //                cmd.Parameters.AddWithValue("@Id", payment.Id);
-        //                cmd.Parameters.AddWithValue("@FDate", DateTime.Now);
-        //                cmd.Parameters.AddWithValue("@FchitCode", (object?)payment.FchitCode ?? DBNull.Value);
-        //                cmd.Parameters.AddWithValue("@FcusCode", (object?)payment.FcusCode ?? DBNull.Value);
-        //                cmd.Parameters.AddWithValue("@fAmount", payment.fAmount);
-        //                cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
+                string query = @"
+            UPDATE PaymentDetails
+            SET 
+                FDate = ISNULL(@FDate, GETDATE()),
+                FchitCode = @FchitCode,
+                FcusCode = @FcusCode,
+                fAmount = @fAmount,
+                FWeight = @FWeight,
+                flag=@flag,
+            WHERE Id = @Id;
+        ";
 
-        //                con.Open();
-        //                int rows = cmd.ExecuteNonQuery();
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@Id", payment.Id);
+                        cmd.Parameters.AddWithValue("@FDate", DateTime.Now);
+                        cmd.Parameters.AddWithValue("@FchitCode", (object?)payment.FchitCode ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@FcusCode", (object?)payment.FcusCode ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@fAmount", payment.fAmount);
+                        cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
+                        cmd.Parameters.AddWithValue("@flag", "Y");
 
-        //                if (rows > 0)
-        //                    return Ok(new { Message = "Payment details updated successfully." });
-        //                else
-        //                    return NotFound(new { Message = "Payment record not found." });
-        //            }
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(new { Message = "Error updating payment details", Error = ex.Message });
-        //    }
-        //}
+                        con.Open();
+                        int rows = cmd.ExecuteNonQuery();
+
+                        if (rows > 0)
+                            return Ok(new { Message = "Payment details updated successfully." });
+                        else
+                            return NotFound(new { Message = "Payment record not found." });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Error updating payment details", Error = ex.Message });
+            }
+        }
 
         public class PaymentDetails
         {
             public int Id { get; set; }
 
             // Nullable — if not provided, backend will use current date
-            public DateTime? FDate { get; set; }
+            //public DateTime? FDate { get; set; }
 
             // Chit code (like scheme or plan)
             public string FchitCode { get; set; }
