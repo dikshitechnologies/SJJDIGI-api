@@ -97,7 +97,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                         cmd.Parameters.AddWithValue("@fCode", newUserCode);
                         cmd.Parameters.AddWithValue("@fAcname", model.Firstname);
                         cmd.Parameters.AddWithValue("@fParent", fparentCode);
-                        cmd.Parameters.AddWithValue("@faclevel", 4); // Example: set level manually (adjust if needed)
+                        cmd.Parameters.AddWithValue("@faclevel", "-4"); // Example: set level manually (adjust if needed)
                         cmd.Parameters.AddWithValue("@fMail", (object)model.Email ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@fPhone", model.Phonenumber);
                         cmd.Parameters.AddWithValue("@FDATE", DateTime.Now);
