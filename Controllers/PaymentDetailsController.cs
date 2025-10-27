@@ -200,15 +200,55 @@ namespace CHITSCHEME.Controllers
         }
 
 
-        [HttpDelete("DeletePaymentDetails/{id}")]
-        public IActionResult DeletePaymentDetails(int id)
+        //[HttpDelete("DeletePaymentDetails/{id}")]
+        //public IActionResult DeletePaymentDetails(int id)
+        //{
+        //    try
+        //    {
+        //        if (id <= 0)
+        //            return BadRequest(new { Message = "Invalid ID" });
+
+        //        string query = "DELETE FROM PaymentDetails WHERE Id = @Id";
+
+        //        int rowsAffected = 0;
+
+        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+        //        {
+        //            using (SqlCommand cmd = new SqlCommand(query, con))
+        //            {
+        //                cmd.Parameters.AddWithValue("@Id", id);
+        //                con.Open();
+        //                rowsAffected = cmd.ExecuteNonQuery();
+        //            }
+        //        }
+
+        //        if (rowsAffected > 0)
+        //        {
+        //            return Ok(new { Message = "Payment record deleted successfully.", DeletedId = id });
+        //        }
+        //        else
+        //        {
+        //            return NotFound(new { Message = "Payment record not found." });
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(new { Message = "Error deleting record", Error = ex.Message });
+        //    }
+        //}
+
+        [HttpDelete("DeletePaymentDetails")]
+        public IActionResult DeletePaymentDetails([FromBody] List<int> ids)
         {
             try
             {
-                if (id <= 0)
-                    return BadRequest(new { Message = "Invalid ID" });
+                if (ids == null || ids.Count == 0)
+                    return BadRequest(new { Message = "No IDs provided." });
 
-                string query = "DELETE FROM PaymentDetails WHERE Id = @Id";
+                // Build dynamic IN clause safely
+                var idParams = string.Join(", ", ids.Select((id, index) => $"@Id{index}"));
+
+                string query = $"DELETE FROM PaymentDetails WHERE Id IN ({idParams})";
 
                 int rowsAffected = 0;
 
@@ -216,7 +256,11 @@ namespace CHITSCHEME.Controllers
                 {
                     using (SqlCommand cmd = new SqlCommand(query, con))
                     {
-                        cmd.Parameters.AddWithValue("@Id", id);
+                        for (int i = 0; i < ids.Count; i++)
+                        {
+                            cmd.Parameters.AddWithValue($"@Id{i}", ids[i]);
+                        }
+
                         con.Open();
                         rowsAffected = cmd.ExecuteNonQuery();
                     }
@@ -224,62 +268,130 @@ namespace CHITSCHEME.Controllers
 
                 if (rowsAffected > 0)
                 {
-                    return Ok(new { Message = "Payment record deleted successfully.", DeletedId = id });
+                    return Ok(new
+                    {
+                        Message = "Payment record(s) deleted successfully.",
+                    });
                 }
                 else
                 {
-                    return NotFound(new { Message = "Payment record not found." });
+                    return NotFound(new { Message = "No matching payment records found to delete." });
                 }
             }
             catch (Exception ex)
             {
-                return BadRequest(new { Message = "Error deleting record", Error = ex.Message });
+                return BadRequest(new { Message = "Error deleting payment record(s).", Error = ex.Message });
             }
         }
 
 
 
 
+        //[HttpPut("UpdatePaymentDetails")]
+        //public IActionResult UpdatePaymentDetails([FromBody] PaymentDetails payment)
+        //{
+        //    try
+        //    {
+        //        if (payment == null || payment.Id <= 0)
+        //            return BadRequest(new { Message = "Invalid payment data or ID." });
+
+        //        string query = @"
+        //    UPDATE PaymentDetails
+        //    SET 
+        //        FDate = ISNULL(@FDate, GETDATE()),
+        //        FchitCode = @FchitCode,
+        //        FcusCode = @FcusCode,
+        //        fAmount = @fAmount,
+        //        FWeight = @FWeight,
+        //        flag=@flag,
+        //    WHERE Id = @Id;
+        //";
+
+        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+        //        {
+        //            using (SqlCommand cmd = new SqlCommand(query, con))
+        //            {
+        //                cmd.Parameters.AddWithValue("@Id", payment.Id);
+        //                cmd.Parameters.AddWithValue("@FDate", DateTime.Now);
+        //                cmd.Parameters.AddWithValue("@FchitCode", (object?)payment.FchitCode ?? DBNull.Value);
+        //                cmd.Parameters.AddWithValue("@FcusCode", (object?)payment.FcusCode ?? DBNull.Value);
+        //                cmd.Parameters.AddWithValue("@fAmount", payment.fAmount);
+        //                cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
+        //                cmd.Parameters.AddWithValue("@flag", "Y");
+
+        //                con.Open();
+        //                int rows = cmd.ExecuteNonQuery();
+
+        //                if (rows > 0)
+        //                    return Ok(new { Message = "Payment details updated successfully." });
+        //                else
+        //                    return NotFound(new { Message = "Payment record not found." });
+        //            }
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(new { Message = "Error updating payment details", Error = ex.Message });
+        //    }
+        //}
+
         [HttpPut("UpdatePaymentDetails")]
-        public IActionResult UpdatePaymentDetails([FromBody] PaymentDetails payment)
+        public IActionResult UpdatePaymentDetails([FromBody] List<PaymentDetails> payments)
         {
             try
             {
-                if (payment == null || payment.Id <= 0)
-                    return BadRequest(new { Message = "Invalid payment data or ID." });
+                if (payments == null || payments.Count == 0)
+                    return BadRequest(new { Message = "No payment data provided." });
 
-                string query = @"
-            UPDATE PaymentDetails
-            SET 
-                FDate = ISNULL(@FDate, GETDATE()),
-                FchitCode = @FchitCode,
-                FcusCode = @FcusCode,
-                fAmount = @fAmount,
-                FWeight = @FWeight,
-                flag=@flag,
-            WHERE Id = @Id;
-        ";
+                int updatedCount = 0;
 
                 using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
                 {
-                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    con.Open();
+
+                    foreach (var payment in payments)
                     {
-                        cmd.Parameters.AddWithValue("@Id", payment.Id);
-                        cmd.Parameters.AddWithValue("@FDate", DateTime.Now);
-                        cmd.Parameters.AddWithValue("@FchitCode", (object?)payment.FchitCode ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@FcusCode", (object?)payment.FcusCode ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@fAmount", payment.fAmount);
-                        cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
-                        cmd.Parameters.AddWithValue("@flag", "Y");
+                        if (payment.Id <= 0)
+                            continue;
 
-                        con.Open();
-                        int rows = cmd.ExecuteNonQuery();
+                        string query = @"
+                    UPDATE PaymentDetails
+                    SET 
+                        FDate = ISNULL(@FDate, GETDATE()),
+                        FchitCode = @FchitCode,
+                        FcusCode = @FcusCode,
+                        fAmount = @fAmount,
+                        FWeight = @FWeight,
+                        Flag = @Flag
+                    WHERE Id = @Id;
+                ";
 
-                        if (rows > 0)
-                            return Ok(new { Message = "Payment details updated successfully." });
-                        else
-                            return NotFound(new { Message = "Payment record not found." });
+                        using (SqlCommand cmd = new SqlCommand(query, con))
+                        {
+                            cmd.Parameters.AddWithValue("@Id", payment.Id);
+                            cmd.Parameters.AddWithValue("@FDate", DateTime.Now );
+                            cmd.Parameters.AddWithValue("@FchitCode", (object?)payment.FchitCode ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@FcusCode", (object?)payment.FcusCode ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@fAmount", payment.fAmount);
+                            cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
+                            cmd.Parameters.AddWithValue("@Flag", "Y");
+
+                            updatedCount += cmd.ExecuteNonQuery();
+                        }
                     }
+                }
+
+                if (updatedCount > 0)
+                {
+                    return Ok(new
+                    {
+                        Message =" payment  updated successfully.",
+                        UpdatedCount = updatedCount
+                    });
+                }
+                else
+                {
+                    return NotFound(new { Message = "No matching payment records found to update." });
                 }
             }
             catch (Exception ex)
