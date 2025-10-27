@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace CHITSCHEME.Controllers
 {
@@ -510,6 +511,8 @@ namespace CHITSCHEME.Controllers
                 var idParams = string.Join(", ", ids.Select((id, index) => $"@Id{index}"));
 
                 string query = $"DELETE FROM PaymentDetails WHERE fvoucher IN ({idParams})";
+                string query1 = $"DELETE FROM Ledger WHERE fvrno IN ({idParams})";
+                string query2 = $"DELETE FROM Bledger WHERE fVouchno IN ({idParams})";
 
                 int rowsAffected = 0;
 
