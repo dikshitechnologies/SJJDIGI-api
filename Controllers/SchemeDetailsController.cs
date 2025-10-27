@@ -716,7 +716,11 @@ namespace CHITSCHEME.Controllers
                         InsertBledger(model.SchemeDetails, voucherNo, conn, transaction);
                         InsertLedger(model.SchemeDetails, voucherNo, conn, transaction);
                         transaction.Commit();
-                        return Ok("Insert successful.");
+                        return Ok(new
+                        {
+                            Message = "Insert successful.",
+                            VoucherNo = voucherNo
+                        });
                     }
                     catch (SqlException sqlEx)
                     {

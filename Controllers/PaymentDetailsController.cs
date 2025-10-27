@@ -52,8 +52,8 @@ namespace CHITSCHEME.Controllers
                 }
 
                 // ✅ Step 2: Insert record (only if no duplicate found)
-                string insertQuery = @"INSERT INTO PaymentDetails (FDate, FchitCode, FcusCode, FWeight, FAmount,flag)
-                               VALUES (@FDate, @FchitCode, @FcusCode, @FWeight, @FAmount,@flag)";
+                string insertQuery = @"INSERT INTO PaymentDetails (FDate, FchitCode, FcusCode, FWeight, FAmount,flag,fvoucher)
+                               VALUES (@FDate, @FchitCode, @FcusCode, @FWeight, @FAmount,@flag,@fvoucher)";
 
                 using (SqlCommand cmd = new SqlCommand(insertQuery, con))
                 {
@@ -63,6 +63,7 @@ namespace CHITSCHEME.Controllers
                     cmd.Parameters.AddWithValue("@FWeight", payment.FWeight);
                     cmd.Parameters.AddWithValue("@FAmount", payment.FAmount);
                     cmd.Parameters.AddWithValue("@flag", "N");
+                    cmd.Parameters.AddWithValue("@fvoucher", payment.Voucher);
                     cmd.ExecuteNonQuery();
                 }
 
@@ -82,6 +83,131 @@ namespace CHITSCHEME.Controllers
 
         //-----------------------------------------------------------admin details ------------------------------------
 
+        //    [HttpGet("GetPaymentDetails")]
+        //    public IActionResult GetPaymentDetails(
+        //int pageNumber = 1,
+        //int pageSize = 10,
+        //DateTime? fromDate = null,
+        //DateTime? toDate = null,
+        //string chitName = null,
+        //string customerName = null)
+        //    {
+        //        try
+        //        {
+        //            if (pageNumber < 1) pageNumber = 1;
+        //            if (pageSize < 1) pageSize = 10;
+
+        //            int offset = (pageNumber - 1) * pageSize;
+
+        //            // ✅ Base query
+        //            string query = @"
+        //    SELECT 
+        //        P.Id,
+        //        P.FDate,
+        //        P.FchitCode,
+        //        ChitParty.fAcname AS ChitName,
+        //        P.FcusCode,
+        //        CusParty.fAcname AS CustomerName,
+        //        P.FWeight,
+        //        P.FAmount,
+        //        p.flag
+        //    FROM PaymentDetails P
+        //    LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
+        //    LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
+        //    WHERE 1=1  and p.flag='N'
+        //    ";
+
+        //            // ✅ Add filters dynamically
+        //            if (fromDate.HasValue)
+        //                query += " AND CAST(P.FDate AS DATE) >= @FromDate";
+        //            if (toDate.HasValue)
+        //                query += " AND CAST(P.FDate AS DATE) <= @ToDate";
+        //            if (!string.IsNullOrEmpty(chitName))
+        //                query += " AND ChitParty.fAcname LIKE '%' + @ChitName + '%'";
+        //            if (!string.IsNullOrEmpty(customerName))
+        //                query += " AND CusParty.fAcname LIKE '%' + @CustomerName + '%'";
+
+        //            // ✅ Order + Pagination
+        //            query += @"
+        //    ORDER BY P.Id DESC
+        //    OFFSET @Offset ROWS
+        //    FETCH NEXT @PageSize ROWS ONLY;
+
+        //    -- Count query
+        //    SELECT COUNT(*) AS TotalRecords 
+        //    FROM PaymentDetails P
+        //    LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
+        //    LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
+        //    WHERE 1=1
+        //    ";
+
+        //            // ✅ Duplicate same filters for count
+        //            if (fromDate.HasValue)
+        //                query += " AND CAST(P.FDate AS DATE) >= @FromDate";
+        //            if (toDate.HasValue)
+        //                query += " AND CAST(P.FDate AS DATE) <= @ToDate";
+        //            if (!string.IsNullOrEmpty(chitName))
+        //                query += " AND ChitParty.fAcname LIKE '%' + @ChitName + '%'";
+        //            if (!string.IsNullOrEmpty(customerName))
+        //                query += " AND CusParty.fAcname LIKE '%' + @CustomerName + '%'";
+
+        //            DataSet ds = new DataSet();
+        //            int totalRecords = 0;
+
+        //            using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+        //            {
+        //                using (SqlCommand cmd = new SqlCommand(query, con))
+        //                {
+        //                    cmd.Parameters.AddWithValue("@Offset", offset);
+        //                    cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
+        //                    if (fromDate.HasValue)
+        //                        cmd.Parameters.AddWithValue("@FromDate", fromDate.Value);
+        //                    if (toDate.HasValue)
+        //                        cmd.Parameters.AddWithValue("@ToDate", toDate.Value);
+        //                    if (!string.IsNullOrEmpty(chitName))
+        //                        cmd.Parameters.AddWithValue("@ChitName", chitName);
+        //                    if (!string.IsNullOrEmpty(customerName))
+        //                        cmd.Parameters.AddWithValue("@CustomerName", customerName);
+
+        //                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+        //                    {
+        //                        adapter.Fill(ds);
+        //                    }
+        //                }
+        //            }
+
+        //            DataTable table = ds.Tables[0];
+        //            if (ds.Tables.Count > 1 && ds.Tables[1].Rows.Count > 0)
+        //                totalRecords = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalRecords"]);
+
+        //            var dataList = new List<Dictionary<string, object>>();
+        //            foreach (DataRow row in table.Rows)
+        //            {
+        //                var dict = new Dictionary<string, object>();
+        //                foreach (DataColumn col in table.Columns)
+        //                {
+        //                    dict[col.ColumnName] = row[col];
+        //                }
+        //                dataList.Add(dict);
+        //            }
+
+        //            return Ok(new
+        //            {
+        //                PageNumber = pageNumber,
+        //                PageSize = pageSize,
+        //                TotalRecords = totalRecords,
+        //                TotalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
+        //                Data = dataList
+        //            });
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            return BadRequest(new { Message = "Error retrieving data", Error = ex.Message });
+        //        }
+        //    }
+
+
         [HttpGet("GetPaymentDetails")]
         public IActionResult GetPaymentDetails(
     int pageNumber = 1,
@@ -89,7 +215,10 @@ namespace CHITSCHEME.Controllers
     DateTime? fromDate = null,
     DateTime? toDate = null,
     string chitName = null,
-    string customerName = null)
+    string customerName = null,
+    string flag = "N",
+    string schemeType = "All" // ✅ new parameter: can be "R", "W", or "All"
+)
         {
             try
             {
@@ -109,14 +238,21 @@ namespace CHITSCHEME.Controllers
             CusParty.fAcname AS CustomerName,
             P.FWeight,
             P.FAmount,
-            p.flag
+            P.flag
         FROM PaymentDetails P
         LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
         LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-        WHERE 1=1  and p.flag='N'
+        WHERE 1=1 
+          AND P.flag = @Flag
         ";
 
-                // ✅ Add filters dynamically
+                // ✅ Apply SchemeType filter dynamically
+                if (!string.IsNullOrEmpty(schemeType) && schemeType != "All")
+                    query += " AND ChitParty.FSchemetype = @SchemeType";
+                else
+                    query += " AND ChitParty.FSchemetype IN ('R','W')";
+
+                // ✅ Optional filters
                 if (fromDate.HasValue)
                     query += " AND CAST(P.FDate AS DATE) >= @FromDate";
                 if (toDate.HasValue)
@@ -137,10 +273,17 @@ namespace CHITSCHEME.Controllers
         FROM PaymentDetails P
         LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
         LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-        WHERE 1=1
+        WHERE 1=1 
+          AND P.flag = @Flag
         ";
 
-                // ✅ Duplicate same filters for count
+                // ✅ Duplicate SchemeType for count query
+                if (!string.IsNullOrEmpty(schemeType) && schemeType != "All")
+                    query += " AND ChitParty.FSchemetype = @SchemeType";
+                else
+                    query += " AND ChitParty.FSchemetype IN ('R','W')";
+
+                // ✅ Apply optional filters for count
                 if (fromDate.HasValue)
                     query += " AND CAST(P.FDate AS DATE) >= @FromDate";
                 if (toDate.HasValue)
@@ -159,6 +302,10 @@ namespace CHITSCHEME.Controllers
                     {
                         cmd.Parameters.AddWithValue("@Offset", offset);
                         cmd.Parameters.AddWithValue("@PageSize", pageSize);
+                        cmd.Parameters.AddWithValue("@Flag", flag);
+
+                        if (!string.IsNullOrEmpty(schemeType) && schemeType != "All")
+                            cmd.Parameters.AddWithValue("@SchemeType", schemeType);
 
                         if (fromDate.HasValue)
                             cmd.Parameters.AddWithValue("@FromDate", fromDate.Value);
@@ -197,6 +344,8 @@ namespace CHITSCHEME.Controllers
                     PageSize = pageSize,
                     TotalRecords = totalRecords,
                     TotalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
+                    FlagFilter = flag,
+                    SchemeTypeFilter = schemeType,
                     Data = dataList
                 });
             }
@@ -209,136 +358,12 @@ namespace CHITSCHEME.Controllers
 
 
 
+
+
+
+
         //-----------------------------------------------------------customer details ------------------------------------
 
-
-        //        [HttpGet("GetCustomerPaymentDetails")]
-        //        public IActionResult GetCustomerPaymentDetails(
-        //   [FromQuery] int pageNumber = 1,
-        //    [FromQuery] int pageSize = 10,
-        //    [FromQuery] DateTime? fromDate = null,
-        //    [FromQuery] DateTime? toDate = null,
-        //    [FromQuery][Required] string customercode = null, // ✅ required
-        //    [FromQuery] string flag = "N"
-        //)
-        //        {
-        //            try
-        //            {
-
-        //                if (string.IsNullOrWhiteSpace(customercode))
-        //                {
-        //                    return BadRequest(new { Message = "Customer name is required to fetch payment details." });
-        //                }
-        //                if (pageNumber < 1) pageNumber = 1;
-        //                if (pageSize < 1) pageSize = 10;
-
-        //                int offset = (pageNumber - 1) * pageSize;
-
-        //                // ✅ Base query
-        //                string query = @"
-        //            SELECT 
-        //                P.Id,
-        //                P.FDate,
-        //                P.FcusCode,
-        //                CusParty.fAcname AS CustomerName,
-        //                P.FWeight,
-        //                P.FAmount,
-        //                P.flag
-        //            FROM PaymentDetails P
-        //            LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-        //            WHERE 1=1
-        //        ";
-
-        //                // ✅ Dynamic flag filter
-        //                if (!string.IsNullOrEmpty(flag))
-        //                    query += " AND P.flag = @Flag";
-
-        //                // ✅ Other filters
-        //                if (fromDate.HasValue)
-        //                    query += " AND CAST(P.FDate AS DATE) >= @FromDate";
-        //                if (toDate.HasValue)
-        //                    query += " AND CAST(P.FDate AS DATE) <= @ToDate";
-        //                if (!string.IsNullOrEmpty(customercode))
-        //                    query += " AND CusParty.fAcname LIKE '%' + @FcusCode + '%'";
-
-        //                // ✅ Pagination
-        //                query += @"
-        //            ORDER BY P.Id DESC
-        //            OFFSET @Offset ROWS
-        //            FETCH NEXT @PageSize ROWS ONLY;
-
-        //            -- Count query
-        //            SELECT COUNT(*) AS TotalRecords
-        //            FROM PaymentDetails P
-        //            LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-        //            WHERE 1=1
-        //        ";
-
-        //                // ✅ Repeat filters for count
-        //                if (!string.IsNullOrEmpty(flag))
-        //                    query += " AND P.flag = @Flag";
-        //                if (fromDate.HasValue)
-        //                    query += " AND CAST(P.FDate AS DATE) >= @FromDate";
-        //                if (toDate.HasValue)
-        //                    query += " AND CAST(P.FDate AS DATE) <= @ToDate";
-        //                if (!string.IsNullOrEmpty(customercode))
-        //                    query += " AND CusParty.fAcname LIKE '%' + @FcusCode + '%'";
-
-        //                DataSet ds = new DataSet();
-        //                int totalRecords = 0;
-
-        //                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-        //                {
-        //                    using (SqlCommand cmd = new SqlCommand(query, con))
-        //                    {
-        //                        cmd.Parameters.AddWithValue("@Offset", offset);
-        //                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
-        //                        cmd.Parameters.AddWithValue("@Flag", flag); // ✅ Added flag parameter
-
-        //                        if (fromDate.HasValue)
-        //                            cmd.Parameters.AddWithValue("@FromDate", fromDate.Value);
-        //                        if (toDate.HasValue)
-        //                            cmd.Parameters.AddWithValue("@ToDate", toDate.Value);
-        //                        if (!string.IsNullOrEmpty(customercode))
-        //                            cmd.Parameters.AddWithValue("@FcusCode", customercode);
-
-        //                        using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
-        //                        {
-        //                            adapter.Fill(ds);
-        //                        }
-        //                    }
-        //                }
-
-        //                DataTable table = ds.Tables[0];
-        //                if (ds.Tables.Count > 1 && ds.Tables[1].Rows.Count > 0)
-        //                    totalRecords = Convert.ToInt32(ds.Tables[1].Rows[0]["TotalRecords"]);
-
-        //                var dataList = new List<Dictionary<string, object>>();
-        //                foreach (DataRow row in table.Rows)
-        //                {
-        //                    var dict = new Dictionary<string, object>();
-        //                    foreach (DataColumn col in table.Columns)
-        //                    {
-        //                        dict[col.ColumnName] = row[col];
-        //                    }
-        //                    dataList.Add(dict);
-        //                }
-
-        //                return Ok(new
-        //                {
-        //                    PageNumber = pageNumber,
-        //                    PageSize = pageSize,
-        //                    TotalRecords = totalRecords,
-        //                    TotalPages = (int)Math.Ceiling((double)totalRecords / pageSize),
-        //                    FlagFilter = flag, // ✅ Added for clarity
-        //                    Data = dataList
-        //                });
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                return BadRequest(new { Message = "Error retrieving customer data", Error = ex.Message });
-        //            }
-        //        }
 
 
 
@@ -484,7 +509,7 @@ namespace CHITSCHEME.Controllers
                 // Build dynamic IN clause safely
                 var idParams = string.Join(", ", ids.Select((id, index) => $"@Id{index}"));
 
-                string query = $"DELETE FROM PaymentDetails WHERE Id IN ({idParams})";
+                string query = $"DELETE FROM PaymentDetails WHERE fvoucher IN ({idParams})";
 
                 int rowsAffected = 0;
 
@@ -612,6 +637,7 @@ namespace CHITSCHEME.Controllers
             public string FcusCode { get; set; }
             public decimal FWeight { get; set; }
             public decimal FAmount { get; set; }
+            public string Voucher { get; set; }
         }
 
 
