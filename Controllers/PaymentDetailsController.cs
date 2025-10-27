@@ -136,11 +136,12 @@ namespace CHITSCHEME.Controllers
                 CusParty.fAcname AS CustomerName,
                 P.FWeight,
                 P.FAmount,
-                p.flag
+                p.flag,
+               p.fvoucher
             FROM PaymentDetails P
             LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
             LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-            WHERE 1=1  and p.flag='N'
+            WHERE 1=1  and p.flag='N'  
             ";
 
                 // ✅ Add filters dynamically
@@ -155,7 +156,7 @@ namespace CHITSCHEME.Controllers
 
                 // ✅ Order + Pagination
                 query += @"
-            ORDER BY P.Id DESC
+            ORDER BY P.Id ASC
             OFFSET @Offset ROWS
             FETCH NEXT @PageSize ROWS ONLY;
 
