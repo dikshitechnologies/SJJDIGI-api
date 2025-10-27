@@ -21,7 +21,32 @@ namespace CHITSCHEME.Controllers
         [HttpPost("paymentDetails")]
         public IActionResult AddPayment([FromBody] PaymentDetailsModel payment)
         {
-            
+
+            if (payment == null)
+                return BadRequest(new { Message = "Invalid payment data." });
+
+            // ✅ Proper validation checks (use ==, not =)
+            if (string.IsNullOrWhiteSpace(payment.FcusCode) || payment.FcusCode == "string"  || payment.FcusCode == "")
+            {
+                return BadRequest(new { Message = "Customer code is required to fetch payment details." });
+            }
+
+            if (string.IsNullOrWhiteSpace(payment.FchitCode) || payment.FchitCode == "string" || payment.FchitCode == "")
+            {
+                return BadRequest(new { Message = "Chit code is required to fetch payment details." });
+            }
+
+            if (string.IsNullOrWhiteSpace(payment.Voucher) || payment.Voucher == "string" || payment.Voucher == "")
+            {
+                return BadRequest(new { Message = "Voucher  Number  is required to fetch payment details." });
+            }
+
+            if (payment.FAmount ==0 )
+            {
+                return BadRequest(new { Message = "FAmount is required to fetch payment details." });
+            }
+
+
 
             using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
             {
