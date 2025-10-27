@@ -65,10 +65,10 @@ namespace CHITSCHEME.Controllers
                 // -------- Check RegisterUsers --------
                 string username = string.Empty;
                 string email = string.Empty;
-                int userId = 0;
+                string userId = string.Empty;
 
                 var regDetailsCmd = new SqlCommand(
-                    "SELECT UserId, UserName, Email FROM RegisterUsers WHERE PhoneNumber = @phone",
+                    "SELECT fcode, fAcname, fMail FROM party WHERE fparent like '000020000900015%' and fPhone= @phone",
                     connection);
                 regDetailsCmd.Parameters.AddWithValue("@phone", request.Phone);
 
@@ -76,62 +76,21 @@ namespace CHITSCHEME.Controllers
                 {
                     if (await reader.ReadAsync())
                     {
-                        userId = Convert.ToInt32(reader["UserId"]);
-                        username = reader["UserName"].ToString();
-                        email = reader["Email"].ToString();
+                        userId = reader["fcode"].ToString();
+                        username = reader["fAcname"].ToString();
+                        email = reader["fMail"].ToString();
                     }
                 }
 
-                // -------- If party exists but not registered, insert new user --------
-                if ((partyName != null && partyPhone != null) && userId == 0)
-                {
-                    using var transaction = connection.BeginTransaction();
-
-                    try
-                    {
-                        var getMaxIdCmd = new SqlCommand(
-                            "SELECT ISNULL(MAX(UserId), 1000) + 1 FROM RegisterUsers WITH (TABLOCKX)",
-                            connection, transaction);
-                        userId = (int)await getMaxIdCmd.ExecuteScalarAsync();
-
-                        var insertCmd = new SqlCommand(@"
-                    INSERT INTO RegisterUsers (UserId, UserName, PhoneNumber, Email, PasswordHash, CreatedAt)
-                    VALUES (@UserId, @UserName, @PhoneNumber, @Email, @PasswordHash, @CreatedAt)",
-                            connection, transaction);
-
-                        insertCmd.Parameters.AddWithValue("@UserId", userId);
-                        insertCmd.Parameters.AddWithValue("@UserName", partyName);
-                        insertCmd.Parameters.AddWithValue("@PhoneNumber", partyPhone);
-                        insertCmd.Parameters.AddWithValue("@Email", "");
-                        insertCmd.Parameters.AddWithValue("@PasswordHash", "");
-                        insertCmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
-
-                        await insertCmd.ExecuteNonQueryAsync();
-                        await transaction.CommitAsync();
-                    }
-                    catch
-                    {
-                        await transaction.RollbackAsync();
-                        throw;
-                    }
-
-                    var tokenNew = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token = tokenNew, UserPermission = "Y", UserId = userId, username = partyName, email = "" });
-                }
-
+      
                 // -------- If party exists and already registered --------
-                if ((partyName != null && partyPhone != null) && userId > 0)
+                if ((partyName != null && partyPhone != null) && userId != "")
                 {
                     var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "Y", UserId = userId, username, email });
+                    return Ok(new { token, UserPermission = "U", UserId = userId, username, email });
                 }
 
-                // -------- If party does not exist but user is registered --------
-                if (partyName == null && userId > 0)
-                {
-                    var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "N", UserId = userId, username, email });
-                }
+           
 
                 // -------- Otherwise --------
                 return Unauthorized(new { message = "Please check the phone number." });
@@ -193,7 +152,7 @@ namespace CHITSCHEME.Controllers
                     {
                         role = "Admin",
                         token,
-                        UserPermission = "N",
+                        UserPermission = "A",
                         UserId = fcompcode,
                         AdminName = adminName,
                         Phone = phone
