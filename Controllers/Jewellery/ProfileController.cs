@@ -22,13 +22,13 @@ namespace CHITSCHEME.Controllers.Jewellery
                 using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
                 {
                     string updateQuery = @"
-                UPDATE RegisterUsers
+                UPDATE party
                 SET 
-                    AddressLine = @AddressLine,
-                    City = @City,
-                    State = @State,
-                    Pincode = @Pincode
-                WHERE UserID = @UserID";
+                    fStreet = @AddressLine,
+                    fCity = @City,
+                    FSTAT = @State,
+                    fPincode = @Pincode
+                WHERE fcode = @UserID";
 
                     using (SqlCommand cmd = new SqlCommand(updateQuery, conn))
                     {
@@ -107,7 +107,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 await conn.OpenAsync();
                 transaction = conn.BeginTransaction();
 
-                string updateQuery = "UPDATE RegisterUsers SET fProfileImg = @fProfileImg WHERE UserID = @UserID";
+                string updateQuery = "UPDATE party SET FImage = @fProfileImg WHERE fCode = @UserID";
 
                 using (SqlCommand cmd = new SqlCommand(updateQuery, conn, transaction))
                 {
@@ -228,7 +228,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                 await cmd.ExecuteNonQueryAsync();
                             }
 
-                            string deleteUserQuery = "DELETE FROM registerusers WHERE userid = @userid";
+                            string deleteUserQuery = "DELETE FROM party WHERE fcode = @userid";
                             int rowsAffected;
                             using (SqlCommand cmd = new SqlCommand(deleteUserQuery, conn, transaction))
                             {

@@ -1,23 +1,23 @@
-﻿using CHITSCHEME.Helpers;
+﻿
+using CHITSCHEME.Helpers;
 using CHITSCHEME.Models;
 using JEWELLBISREACT.DBConnection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System.IdentityModel.Tokens.Jwt;
-
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class RegisterPageController : ControllerBase
+    public class RegisterPage2Controller : ControllerBase
     {
-
 
         //---------------------------------------------Duplicate Name Checking ---------------------------------
         private bool RegistruserExists(SqlConnection con, string sectionName)
-         {
-            using (SqlCommand cmd = new SqlCommand("SELECT 1 FROM party   where fparent like '000020000900015%' and fphone=@PhoneNumber", con))
+        {
+            using (SqlCommand cmd = new SqlCommand("SELECT 1 FROM RegisterUsers  where PhoneNumber=@PhoneNumber", con))
             {
                 cmd.Parameters.AddWithValue("@PhoneNumber", sectionName);
                 return cmd.ExecuteScalar() != null;
@@ -29,93 +29,127 @@ namespace CHITSCHEME.Controllers.Jewellery
         [HttpPost("RegisterUser")]
         public async Task<IActionResult> RegisterUser([FromBody] RegisterUser model)
         {
-            if (model == null)
+
+            if (model == null  )
+            {
                 return BadRequest("Model cannot be null.");
+            }
 
-            // ✅ Validate First Name
+            // Validate input
             if (string.IsNullOrWhiteSpace(model.Firstname) || model.Firstname.ToLower() == "string")
+            {
                 return BadRequest("First name is empty.");
+            }
             if (model.Firstname.Length > 100)
+            {
                 return BadRequest("First name cannot exceed 100 characters.");
+            }
 
-            // ✅ Validate Phone Number
+
             if (string.IsNullOrWhiteSpace(model.Phonenumber) || model.Phonenumber.ToLower() == "string")
+            {
                 return BadRequest("Phone number is empty.");
+            }
             if (model.Phonenumber.Length > 20)
+            {
                 return BadRequest("Phone number cannot exceed 20 characters.");
+            }
 
-            using (SqlConnection connection = new SqlConnection(DBHelper.GetConnection()))
+            using(SqlConnection connection = new SqlConnection(DBHelper.GetConnection()))
             {
                 await connection.OpenAsync();
 
-                if (RegistruserExists(connection, model.Phonenumber))
+                using (SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM REGISTERUSERS WHERE PHONENUMBER=@PHONENUMBER", connection))
                 {
-                    return Conflict(new { message = "Phonenumber  already exists" });
+                    cmd.Parameters.AddWithValue("PHONENUMBER", model.Phonenumber);
+                    int count = (int)await cmd.ExecuteScalarAsync();
+                    if (count > 0)
+                    {
+                        return BadRequest(new { message = "Phone number already exists." });
+                    }
                 }
+            }
+           
 
-                // ✅ Get max fcode from party
-                string maxRegisterIdQuery = "SELECT MAX(fcode) FROM party";
-                string insertPartyQuery = @"
-            INSERT INTO party (fCode, fAcname, fParent, faclevel, fMail, fPhone, FDATE)
-            VALUES (@fCode, @fAcname, @fParent, @faclevel, @fMail, @fPhone, @FDATE);
-        ";
+                string maxRegisterIdQuery = "SELECT MAX(UserID) FROM RegisterUsers";
+            string insertQuery = @"
+        INSERT INTO RegisterUsers (UserID,UserName, Email, PhoneNumber, PasswordHash,CreatedAt)
+        VALUES (@UserID,@UserName, @Email, @PhoneNumber, @PasswordHash,@CreatedAt);";
 
+            using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+            {
                 try
                 {
-                    object result;
-                    using (SqlCommand maxIdCommand = new SqlCommand(maxRegisterIdQuery, connection))
-                    {
-                        result = await maxIdCommand.ExecuteScalarAsync();
-                    }
+                    // Open connection
+                    await conn.OpenAsync();
 
-                    // ✅ Generate new fCode
-                    string newUserCode;
-                    if (result == DBNull.Value || result == null)
+                    // Get the last user id from the database
+                    using (SqlCommand maxIdCommand = new SqlCommand(maxRegisterIdQuery, conn))
                     {
-                        newUserCode = "00001";  // First user
-                    }
-                    else
-                    {
-                        string lastUserId = result.ToString();
-                        if (int.TryParse(lastUserId, out int lastId))
+                        object result = await maxIdCommand.ExecuteScalarAsync();
+
+                        string newUserCode;
+                        if (result == DBNull.Value || result == null)
                         {
-                            int nextId = lastId + 1;
-                            newUserCode = nextId.ToString("D5");
+                            newUserCode = "1000";  // First user
                         }
                         else
                         {
-                            return StatusCode(500, new { message = "Invalid user ID format in database." });
+                            string lastUserId = result.ToString();
+                            if (int.TryParse(lastUserId, out int lastId))
+                            {
+                                int nextId = lastId + 1;
+                                newUserCode = nextId.ToString("D4");  
+                            }
+                            else
+                            {
+                                return StatusCode(500, new { message = "Invalid user ID format in database." });
+                            }
                         }
-                    }
 
-                    // ✅ Generate fParent Code
-                    string fparentCode = "000020000900015" + newUserCode;
+                        if (RegistruserExists(conn, model.Phonenumber))
+                        {
+                            return Conflict(new { message = "Phonenumber  already exists" });
+                        }
+                        // Insert new user with the generated user code
+                        using (SqlCommand cmd = new SqlCommand(insertQuery, conn))
+                        {
 
-                    // ✅ Insert new record into party
-                    using (SqlCommand cmd = new SqlCommand(insertPartyQuery, connection))
-                    {
-                        cmd.Parameters.AddWithValue("@fCode", newUserCode);
-                        cmd.Parameters.AddWithValue("@fAcname", model.Firstname);
-                        cmd.Parameters.AddWithValue("@fParent", fparentCode);
-                        cmd.Parameters.AddWithValue("@faclevel", 4); // Example: set level manually (adjust if needed)
-                        cmd.Parameters.AddWithValue("@fMail", (object)model.Email ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@fPhone", model.Phonenumber);
-                        cmd.Parameters.AddWithValue("@FDATE", DateTime.Now);
 
-                        int rowsAffected = await cmd.ExecuteNonQueryAsync();
+                            cmd.Parameters.AddWithValue("@UserID", newUserCode);
+                            cmd.Parameters.AddWithValue("@UserName", model.Firstname);
+                            cmd.Parameters.AddWithValue("@Email", model.Email);
+                            cmd.Parameters.AddWithValue("@PhoneNumber", model.Phonenumber);
+                            cmd.Parameters.AddWithValue("@PasswordHash", "");
+                            cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
 
-                        if (rowsAffected > 0)
-                            return Ok(new { message = "User registered successfully in 'party' table" });
-                        else
-                            return StatusCode(500, "Failed to register user.");
+                            int rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+                            if (rowsAffected > 0)
+                            {
+                                return Ok(new { message = "User registered successfully" });
+                            }
+                            else
+                            {
+                                return StatusCode(500, "Failed to register user.");
+                            }
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
+                    // Log the exception
                     return StatusCode(500, new { message = $"An error occurred: {ex.Message}" });
+                }
+                finally
+                {
+                    // Ensure that the connection is closed
+                    conn.Close();
                 }
             }
         }
+
+
 
 
         [HttpGet("profilePage/{UserID}")]
@@ -146,7 +180,7 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                     if (role == "Admin")
                     {
-                     
+                        // Admin → COMPANY table (no AddressLine, City, etc.)
                         query = @"
                     SELECT 
                         fcompname AS UserName, 
@@ -161,18 +195,18 @@ namespace CHITSCHEME.Controllers.Jewellery
                     }
                     else
                     {
-                        
+                        // Normal user → RegisterUsers table
                         query = @"
-                     SELECT 
-                         fAcname, 
-                         fMail, 
-                         ISNULL(fstreet, '') AS AddressLine,
-                         ISNULL(fCity, '') AS City,
-                         ISNULL(FSTAT, '') AS State,
-                         ISNULL(fPincode, '') AS Pincode,
-                         ISNULL(fImage, '') AS fprofileImg
-                     FROM party 
-                     WHERE fCode=@UserID";
+                    SELECT 
+                        UserName, 
+                        Email, 
+                        ISNULL(AddressLine, '') AS AddressLine,
+                        ISNULL(City, '') AS City,
+                        ISNULL(State, '') AS State,
+                        ISNULL(Pincode, '') AS Pincode,
+                        ISNULL(fprofileImg, '') AS fprofileImg
+                    FROM RegisterUsers 
+                    WHERE UserID = @UserID";
                     }
 
                     using (SqlCommand command = new SqlCommand(query, connection))
@@ -185,8 +219,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                             {
                                 var result = new
                                 {
-                                    UserName = reader["fAcname"].ToString(),
-                                    Email = reader["fMail"].ToString(),
+                                    UserName = reader["UserName"].ToString(),
+                                    Email = reader["Email"].ToString(),
                                     AddressLine = reader["AddressLine"].ToString(),
                                     City = reader["City"].ToString(),
                                     State = reader["State"].ToString(),
