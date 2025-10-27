@@ -87,7 +87,7 @@ namespace CHITSCHEME.Controllers
                 if ((partyName != null && partyPhone != null) && userId != "")
                 {
                     var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "U", UserId = userId, username, email });
+                    return Ok(new { token, UserPermission = "U", UserId = userId, username, email, phone=partyPhone });
                 }
 
            
