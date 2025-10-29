@@ -129,6 +129,7 @@ namespace CHITSCHEME.Controllers
                 string query = @"
             SELECT 
                 P.Id,
+                p.fvoucher,
                 P.FDate,
                 P.FchitCode,
                 ChitParty.fAcname AS ChitName,
@@ -155,7 +156,7 @@ namespace CHITSCHEME.Controllers
 
                 // ✅ Order + Pagination
                 query += @"
-            ORDER BY P.Id DESC
+            ORDER BY P.Id asc
             OFFSET @Offset ROWS
             FETCH NEXT @PageSize ROWS ONLY;
 
