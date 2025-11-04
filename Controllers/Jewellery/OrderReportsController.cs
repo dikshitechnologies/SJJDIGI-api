@@ -12,428 +12,77 @@ namespace CHITSCHEME.Controllers.Jewellery
     [ApiController]
     public class OrderReportsController : ControllerBase
     {
-        [HttpGet("PendingOrdersReport")]
-        public async Task<IActionResult> GetPendingOrdersReport()
+    
+
+
+
+        [HttpGet("PendingOrders-customer")]
+        public async Task<IActionResult> GetCustomerOrdersPending(string customerCode)
         {
-            var result = new List<PendingOrderDto>();
+            if (string.IsNullOrEmpty(customerCode))
+                return BadRequest("Invalid customer code.");
 
             try
             {
-               
-
                 using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
                 {
                     await con.OpenAsync();
 
-                    var query = @"
-                     SELECT 
-                        o.OrderID,
-                        o.CustomerCode,
-                        RU.fAcname,
-                        RU.fphone,
-                        o.PaymentMethod,
-                        o.OrderDate,
-                        o.DeliveryStatus
-                    FROM Orders o
-                    JOIN party RU ON RU.fcode = o.CustomerCode
-                    WHERE o.DeliveryStatus = 'Pending'";
-
-                    using (SqlCommand cmd = new SqlCommand(query, con))
-                    {
-                        using (var reader = await cmd.ExecuteReaderAsync())
-                        {
-                            while (await reader.ReadAsync())
-                            {
-                                result.Add(new PendingOrderDto
-                                {
-                                    OrderID = reader.GetInt32(0),
-                                    CustomerCode = reader.GetString(1),
-                                    UserName = reader.GetString(2),
-                                    PhoneNumber = reader.GetString(3),
-                                    PaymentMethod = reader.GetString(4),
-                                    OrderDate = reader.GetDateTime(5),
-                                    DeliveryStatus = reader.GetString(6)
-                                });
-                            }
-                        }
-                    }
-                }
-
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Error retrieving data: {ex.Message}");
-            }
-        }
-        //[HttpGet("PendingOrdersReport")]
-        //public async Task<IActionResult> GetPendingOrdersReport()
-        //{
-        //    var result = new List<PendingOrderDto>();
-
-        //    try
-        //    {
-
-
-        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-        //        {
-        //            await con.OpenAsync();
-
-        //            var query = @"
-        //            SELECT 
-        //                o.OrderID,
-        //                o.CustomerCode,
-        //                RU.UserName,
-        //                RU.PhoneNumber,
-        //                o.PaymentMethod,
-        //                o.OrderDate,
-        //                o.DeliveryStatus
-        //            FROM Orders o
-        //            JOIN RegisterUsers RU ON RU.UserID = o.CustomerCode
-        //            WHERE o.DeliveryStatus = 'Pending'";
-
-        //            using (SqlCommand cmd = new SqlCommand(query, con))
-        //            {
-        //                using (var reader = await cmd.ExecuteReaderAsync())
-        //                {
-        //                    while (await reader.ReadAsync())
-        //                    {
-        //                        result.Add(new PendingOrderDto
-        //                        {
-        //                            OrderID = reader.GetInt32(0),
-        //                            CustomerCode = reader.GetString(1),
-        //                            UserName = reader.GetString(2),
-        //                            PhoneNumber = reader.GetString(3),
-        //                            PaymentMethod = reader.GetString(4),
-        //                            OrderDate = reader.GetDateTime(5),
-        //                            DeliveryStatus = reader.GetString(6)
-        //                        });
-        //                    }
-        //                }
-        //            }
-        //        }
-
-        //        return Ok(result);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, $"Error retrieving data: {ex.Message}");
-        //    }
-        //}
-
-        [HttpGet("DeliveredSummaryDetailed")]
-        public async Task<IActionResult> GetDeliveredOrdersDetailed(string startDate, string endDate)
-        {
-            var result = new List<DeliveredOrderFullDto>();
-
-            try
-            {
-                if (!DateTime.TryParse(startDate, out DateTime start))
-                    return BadRequest("Invalid startDate format. Use yyyy-MM-dd.");
-
-                if (!DateTime.TryParse(endDate, out DateTime end))
-                    return BadRequest("Invalid endDate format. Use yyyy-MM-dd.");
-
-                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-                {
-                    await con.OpenAsync();
-
-                    // Query to get full order, customer, and item details
-                    var query = @"
-               SELECT 
-                        o.OrderID,
-                        o.CustomerCode,
-                        ru.fAcname,
-                        o.OrderDate,
-                        CAST(o.DeliveryAddress AS NVARCHAR(MAX)) AS DeliveryAddress,
-                        CAST(o.City AS NVARCHAR(100)) AS City,
-                        CAST(o.State AS NVARCHAR(100)) AS State,
-                        o.Pincode,
-                        o.PaymentMethod,
-                        o.DeliveryStatus,
-                        i.fItemname,
-                        oi.ItemCode,
-                        oi.Quantity,
-                        oi.Price
-                    FROM Orders o
-                    JOIN party ru ON ru.fcode = o.CustomerCode
-                    JOIN OrderItems oi ON oi.OrderID = o.OrderID
-                    LEFT JOIN item11 i ON i.fItemcode = oi.ItemCode
-                    WHERE o.DeliveryStatus = 'Delivered'
-                  AND o.OrderDate BETWEEN @startDate AND @endDate
-                ORDER BY o.OrderID, o.OrderDate DESC";
-
-                    using (SqlCommand cmd = new SqlCommand(query, con))
-                    {
-                        cmd.Parameters.AddWithValue("@startDate", start);
-                        cmd.Parameters.AddWithValue("@endDate", end);
-
-                        using (var reader = await cmd.ExecuteReaderAsync())
-                        {
-                            int currentOrderId = -1;
-                            DeliveredOrderFullDto currentOrder = null;
-
-                            while (await reader.ReadAsync())
-                            {
-                                int orderId = reader.GetInt32(0);
-
-                                // New order
-                                if (orderId != currentOrderId)
-                                {
-                                    currentOrderId = orderId;
-
-                                    currentOrder = new DeliveredOrderFullDto
-                                    {
-                                        CustomerDetails = new DeliveredCustomerSummaryDto
-                                        {
-                                            OrderID = orderId,
-                                            CustomerCode = reader.GetString(1),
-                                            UserName = reader.GetString(2),
-                                            OrderDate = reader.GetDateTime(3),
-                                            DeliveryAddress = reader.GetString(4),
-                                            City = reader.GetString(5),
-                                            State = reader.GetString(6),
-                                            Pincode = reader.GetString(7),
-                                            PaymentMethod = reader.GetString(8),
-                                            DeliveryStatus = reader.GetString(9),
-                                            TotalItems = 0,
-                                            TotalAmount = 0
-                                        },
-                                        Items = new List<DeliveredItemDto>()
-                                    };
-
-                                    result.Add(currentOrder);
-                                }
-
-                                // Add item to the order
-                                var qty = reader.GetInt32(12);
-                                var price = reader.GetDecimal(13);
-
-                                currentOrder.Items.Add(new DeliveredItemDto
-                                {
-                                    ItemName = reader.IsDBNull(10) ? null : reader.GetString(10),
-                                    ItemCode = reader.GetString(11),
-                                    Quantity = qty,
-                                    Price = price,
-                                    DeliveryStatus = currentOrder.CustomerDetails.DeliveryStatus,
-                                    OrderDate = currentOrder.CustomerDetails.OrderDate
-                                });
-
-                                currentOrder.CustomerDetails.TotalItems += qty;
-                                currentOrder.CustomerDetails.TotalAmount += qty * price;
-                            }
-                        }
-                    }
-                }
-
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal Server Error: {ex.Message}");
-            }
-        }
-
-
-        //[HttpGet("DeliveredSummaryDetailed")]
-        //public async Task<IActionResult> GetDeliveredOrdersDetailed(string startDate, string endDate)
-        //{
-        //    var result = new List<DeliveredOrderFullDto>();
-
-        //    try
-        //    {
-        //        if (!DateTime.TryParse(startDate, out DateTime start))
-        //            return BadRequest("Invalid startDate format. Use yyyy-MM-dd.");
-
-        //        if (!DateTime.TryParse(endDate, out DateTime end))
-        //            return BadRequest("Invalid endDate format. Use yyyy-MM-dd.");
-
-        //        using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-        //        {
-        //            await con.OpenAsync();
-
-        //            // Query to get full order, customer, and item details
-        //            var query = @"
-        //        SELECT 
-        //            o.OrderID,
-        //            o.CustomerCode,
-        //            ru.UserName,
-        //            o.OrderDate,
-        //            CAST(o.DeliveryAddress AS NVARCHAR(MAX)) AS DeliveryAddress,
-        //            CAST(o.City AS NVARCHAR(100)) AS City,
-        //            CAST(o.State AS NVARCHAR(100)) AS State,
-        //            o.Pincode,
-        //            o.PaymentMethod,
-        //            o.DeliveryStatus,
-        //            i.fItemname,
-        //            oi.ItemCode,
-        //            oi.Quantity,
-        //            oi.Price
-        //        FROM Orders o
-        //        JOIN RegisterUsers ru ON ru.UserID = o.CustomerCode
-        //        JOIN OrderItems oi ON oi.OrderID = o.OrderID
-        //        LEFT JOIN item11 i ON i.fItemcode = oi.ItemCode
-        //        WHERE o.DeliveryStatus = 'Delivered'
-        //          AND o.OrderDate BETWEEN @startDate AND @endDate
-        //        ORDER BY o.OrderID, o.OrderDate DESC";
-
-        //            using (SqlCommand cmd = new SqlCommand(query, con))
-        //            {
-        //                cmd.Parameters.AddWithValue("@startDate", start);
-        //                cmd.Parameters.AddWithValue("@endDate", end);
-
-        //                using (var reader = await cmd.ExecuteReaderAsync())
-        //                {
-        //                    int currentOrderId = -1;
-        //                    DeliveredOrderFullDto currentOrder = null;
-
-        //                    while (await reader.ReadAsync())
-        //                    {
-        //                        int orderId = reader.GetInt32(0);
-
-        //                        // New order
-        //                        if (orderId != currentOrderId)
-        //                        {
-        //                            currentOrderId = orderId;
-
-        //                            currentOrder = new DeliveredOrderFullDto
-        //                            {
-        //                                CustomerDetails = new DeliveredCustomerSummaryDto
-        //                                {
-        //                                    OrderID = orderId,
-        //                                    CustomerCode = reader.GetString(1),
-        //                                    UserName = reader.GetString(2),
-        //                                    OrderDate = reader.GetDateTime(3),
-        //                                    DeliveryAddress = reader.GetString(4),
-        //                                    City = reader.GetString(5),
-        //                                    State = reader.GetString(6),
-        //                                    Pincode = reader.GetString(7),
-        //                                    PaymentMethod = reader.GetString(8),
-        //                                    DeliveryStatus = reader.GetString(9),
-        //                                    TotalItems = 0,
-        //                                    TotalAmount = 0
-        //                                },
-        //                                Items = new List<DeliveredItemDto>()
-        //                            };
-
-        //                            result.Add(currentOrder);
-        //                        }
-
-        //                        // Add item to the order
-        //                        var qty = reader.GetInt32(12);
-        //                        var price = reader.GetDecimal(13);
-
-        //                        currentOrder.Items.Add(new DeliveredItemDto
-        //                        {
-        //                            ItemName = reader.IsDBNull(10) ? null : reader.GetString(10),
-        //                            ItemCode = reader.GetString(11),
-        //                            Quantity = qty,
-        //                            Price = price,
-        //                            DeliveryStatus = currentOrder.CustomerDetails.DeliveryStatus,
-        //                            OrderDate = currentOrder.CustomerDetails.OrderDate
-        //                        });
-
-        //                        currentOrder.CustomerDetails.TotalItems += qty;
-        //                        currentOrder.CustomerDetails.TotalAmount += qty * price;
-        //                    }
-        //                }
-        //            }
-        //        }
-
-        //        return Ok(result);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, $"Internal Server Error: {ex.Message}");
-        //    }
-        //}
-
-
-
-        [HttpGet("DeliveredSummary")]
-        public async Task<IActionResult> GetDeliveredOrdersSummary(string startDate, string endDate)
-        {
-            var result = new List<DeliveredOrderSummaryDto>();
-            
-
-            try
-            {
-                // Convert strings to DateTime
-                if (!DateTime.TryParse(startDate, out DateTime start))
-                    return BadRequest("Invalid startDate format. Use yyyy-MM-dd.");
-
-                if (!DateTime.TryParse(endDate, out DateTime end))
-                    return BadRequest("Invalid endDate format. Use yyyy-MM-dd.");
-
-                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
-                {
-                    await con.OpenAsync();
-
-                    var query = @"
+                    string query = @"
                 SELECT 
-                    o.OrderID,
-                    o.CustomerCode,
-                    o.OrderDate,
-                    CAST(o.DeliveryAddress AS NVARCHAR(MAX)) AS DeliveryAddress,
-                    CAST(o.City AS NVARCHAR(100)) AS City,
-                    CAST(o.State AS NVARCHAR(100)) AS State,
-                    o.Pincode,
-                    o.PaymentMethod,
-                    o.DeliveryStatus,
-                    SUM(oi.Quantity) AS TotalItems,
-                    SUM(oi.Price * oi.Quantity) AS TotalAmount
-                FROM Orders o
-                JOIN OrderItems oi ON o.OrderID = oi.OrderID
-                WHERE o.DeliveryStatus = 'Delivered'
-                  AND o.OrderDate BETWEEN @startDate AND @endDate
-                GROUP BY 
-                    o.OrderID, o.CustomerCode, o.OrderDate,
-                    CAST(o.DeliveryAddress AS NVARCHAR(MAX)),
-                    CAST(o.City AS NVARCHAR(100)),
-                    CAST(o.State AS NVARCHAR(100)),
-                    o.Pincode, o.PaymentMethod, o.DeliveryStatus
-                ORDER BY o.OrderDate DESC";
+                    B.fVouchno, 
+                    I.fItemName,
+                    IP.fImage1,
+                    IT.fAmount,
+                    B.FVOUCHDT,
+                    IT.FproductID,
+                    IT.fTotQty
+                FROM BLEDGEROP B  
+                JOIN ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+                JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
+                JOIN ITEM I ON I.fItemcode = IT.fItemcode 
+                WHERE B.fCucode = @CustomerCode 
+                AND B.fvType = 'OD' 
+                AND B.FORDERSTATUS = 'N'";
 
                     using (SqlCommand cmd = new SqlCommand(query, con))
                     {
-                        cmd.Parameters.AddWithValue("@startDate", start);
-                        cmd.Parameters.AddWithValue("@endDate", end);
+                        cmd.Parameters.AddWithValue("@CustomerCode", customerCode);
 
-                        using (var reader = await cmd.ExecuteReaderAsync())
+                        using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                         {
+                            var orders = new List<object>();
                             while (await reader.ReadAsync())
                             {
-                                result.Add(new DeliveredOrderSummaryDto
+                                orders.Add(new
                                 {
-                                    OrderID = reader.GetInt32(0),
-                                    CustomerCode = reader.GetString(1),
-                                    OrderDate = reader.GetDateTime(2),
-                                    DeliveryAddress = reader.GetString(3),
-                                    City = reader.GetString(4),
-                                    State = reader.GetString(5),
-                                    Pincode = reader.GetString(6),
-                                    PaymentMethod = reader.GetString(7),
-                                    DeliveryStatus = reader.GetString(8),
-                                    TotalItems = reader.GetInt32(9),
-                                    TotalAmount = reader.GetDecimal(10)
+                                    VoucherNo = reader["fVouchno"]?.ToString(),
+                                    ItemName = reader["fItemName"]?.ToString(),
+                                    ItemImage = reader["fImage1"]?.ToString(),
+                                    Amount = reader["fAmount"] != DBNull.Value ? Convert.ToDouble(reader["fAmount"]) : 0.0,
+                                    VoucherDate = reader["FVOUCHDT"] != DBNull.Value ? Convert.ToDateTime(reader["FVOUCHDT"]) : (DateTime?)null,
+                                    ProductId = reader["FproductID"]?.ToString(),
+                                    TotalQty = reader["fTotQty"] != DBNull.Value ? Convert.ToInt32(reader["fTotQty"]) : 0,
+                                    orderStatus = "Pending"
                                 });
                             }
+
+                            return Ok(orders);
                         }
                     }
-
-                    return Ok(result);
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal Server Error: {ex.Message}");
+                return StatusCode(500, $"Error retrieving orders: {ex.Message}");
             }
         }
 
-        [HttpGet("OrderItems/{orderId}")]
-        public async Task<IActionResult> GetOrderItemsByOrderId([FromRoute] int orderId)
+        [HttpGet("DeliveredOrders-customer")]
+        public async Task<IActionResult> GetCustomerOrdersDelivered(string customerCode)
         {
-            var result = new List<OrderItemDetailDto>();
+            if (string.IsNullOrEmpty(customerCode))
+                return BadRequest("Invalid customer code.");
 
             try
             {
@@ -441,72 +90,243 @@ namespace CHITSCHEME.Controllers.Jewellery
                 {
                     await con.OpenAsync();
 
-                    // Step 1: Check delivery status
-                    string statusQuery = "SELECT DeliveryStatus FROM Orders WHERE OrderID = @orderId";
-                    using (SqlCommand statusCmd = new SqlCommand(statusQuery, con))
+                    string query = @"
+                SELECT 
+                    B.fVouchno, 
+                    I.fItemName,
+                    IP.fImage1,
+                    IT.fAmount,
+                    B.FVOUCHDT,
+                    IT.FproductID,
+                    IT.fTotQty
+                FROM BLEDGEROP B  
+                JOIN ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+                JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
+                JOIN ITEM I ON I.fItemcode = IT.fItemcode 
+                WHERE B.fCucode = @CustomerCode 
+                AND B.fvType = 'OD' 
+                AND B.FORDERSTATUS = 'Y'";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
                     {
-                        statusCmd.Parameters.AddWithValue("@orderId", orderId);
-                        var statusResult = await statusCmd.ExecuteScalarAsync();
+                        cmd.Parameters.AddWithValue("@CustomerCode", customerCode);
 
-                        if (statusResult == null)
+                        using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                         {
-                            return NotFound(new { message = "Order not found." });
-                        }
+                            var orders = new List<object>();
+                            while (await reader.ReadAsync())
+                            {
+                                orders.Add(new
+                                {
+                                    VoucherNo = reader["fVouchno"]?.ToString(),
+                                    ItemName = reader["fItemName"]?.ToString(),
+                                    ItemImage = reader["fImage1"]?.ToString(),
+                                    Amount = reader["fAmount"] != DBNull.Value ? Convert.ToDouble(reader["fAmount"]) : 0.0,
+                                    VoucherDate = reader["FVOUCHDT"] != DBNull.Value ? Convert.ToDateTime(reader["FVOUCHDT"]) : (DateTime?)null,
+                                    ProductId = reader["FproductID"]?.ToString(),
+                                    TotalQty = reader["fTotQty"] != DBNull.Value ? Convert.ToInt32(reader["fTotQty"]) : 0,
+                                    orderStatus = "Delivered"
+                                });
+                            }
 
-                        string deliveryStatus = statusResult.ToString();
-
-                        if (deliveryStatus == "Delivered")
-                        {
-                            return BadRequest(new { message = $"Order is Already delivered yet. Current status: {deliveryStatus}" });
+                            return Ok(orders);
                         }
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error retrieving orders: {ex.Message}");
+            }
+        }
 
-                    // Step 2: Fetch order items
-                    string itemQuery = @"
+
+        [HttpGet("pending-orders-admin")]
+        public async Task<IActionResult> GetPendingOrders(
+        string? searchTerm,
+        DateTime? fromDate,
+        DateTime? toDate,
+        int pageNumber = 1,
+        int pageSize = 50)
+        {
+            try
+            {
+                var results = new List<object>();
+
+                using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    await conn.OpenAsync();
+
+                    string query = @"
                 SELECT 
-                    oi.OrderItemID,
-                    oi.ItemCode,
-                    i.fitemname,
-                    oi.quantity,
-                    oi.price ,
-                    I.fimage
-                FROM OrderItems oi 
-                LEFT JOIN item11 i ON i.fItemcode = oi.ItemCode  
-                WHERE oi.OrderID = @orderId";
+                    P.FACNAME, 
+                    B.fVouchno, 
+                    I.fItemName, 
+                    IP.fImage1, 
+                    IT.fAmount, 
+                    B.FVOUCHDT, 
+                    IT.FproductID, 
+                    IT.fTotQty
+                FROM 
+                    BLEDGEROP B  
+                JOIN 
+                    ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+                JOIN 
+                    ItemPurchaseOP IP ON IP.fID = IT.FproductID
+                JOIN 
+                    PARTY P ON P.FCODE = B.fCucode 
+                JOIN 
+                    ITEM I ON I.fItemcode = IT.fItemcode 
+                WHERE 
+                    B.fvType = 'OD' 
+                    AND B.FORDERSTATUS = 'N'
+                    AND (@SearchTerm IS NULL OR (
+                            P.FACNAME LIKE '%' + @SearchTerm + '%' OR
+                            I.fItemName LIKE '%' + @SearchTerm + '%' OR
+                            B.fVouchno LIKE '%' + @SearchTerm + '%'
+                        ))
+                    AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
+                    AND (@ToDate IS NULL OR B.FVOUCHDT <= @ToDate)
+                ORDER BY 
+                    B.FVOUCHDT DESC
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
-                    using (SqlCommand cmd = new SqlCommand(itemQuery, con))
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
-                        cmd.Parameters.AddWithValue("@orderId", orderId);
+                        cmd.Parameters.AddWithValue("@SearchTerm", (object)searchTerm ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@FromDate", (object)fromDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ToDate", (object)toDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Offset", (pageNumber - 1) * pageSize);
+                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
 
                         using (var reader = await cmd.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                result.Add(new OrderItemDetailDto
+                                results.Add(new
                                 {
-                                    OrderItemID = reader.GetInt32(0),
-                                    ItemCode = reader.GetString(1),
-                                    FItemName = reader.GetString(2),
-                                    Quantity = reader.GetInt32(3),
-                                    Price = reader.GetDecimal(4),
-                                    IMAGE = reader.GetString(5)
+                                    PartyName = reader["FACNAME"].ToString(),
+                                    VoucherNo = reader["fVouchno"].ToString(),
+                                    ItemName = reader["fItemName"].ToString(),
+                                    Image = reader["fImage1"]?.ToString(),
+                                    Amount = reader["fAmount"],
+                                    VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
+                                    ProductId = reader["FproductID"],
+                                    TotalQty = reader["fTotQty"]
                                 });
                             }
                         }
                     }
                 }
 
-                return Ok(result);
+                return Ok(new
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Data = results
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal Server Error: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
 
-        [HttpPut("MarkAsDelivered/{orderId}")]
-        public async Task<IActionResult> MarkOrderAsDelivered([FromRoute] string orderId)
+        [HttpGet("Delivered-orders-admin")]
+        public async Task<IActionResult> GetDeliveredOrders(
+        string? searchTerm,
+        DateTime? fromDate,
+        DateTime? toDate,
+        int pageNumber = 1,
+        int pageSize = 50)
+        {
+            try
+            {
+                var results = new List<object>();
+
+                using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    await conn.OpenAsync();
+
+                    string query = @"
+                SELECT 
+                    P.FACNAME, 
+                    B.fVouchno, 
+                    I.fItemName, 
+                    IP.fImage1, 
+                    IT.fAmount, 
+                    B.FVOUCHDT, 
+                    IT.FproductID, 
+                    IT.fTotQty
+                FROM 
+                    BLEDGEROP B  
+                JOIN 
+                    ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+                JOIN 
+                    ItemPurchaseOP IP ON IP.fID = IT.FproductID
+                JOIN 
+                    PARTY P ON P.FCODE = B.fCucode 
+                JOIN 
+                    ITEM I ON I.fItemcode = IT.fItemcode 
+                WHERE 
+                    B.fvType = 'OD' 
+                    AND B.FORDERSTATUS = 'Y'
+                    AND (@SearchTerm IS NULL OR (
+                            P.FACNAME LIKE '%' + @SearchTerm + '%' OR
+                            I.fItemName LIKE '%' + @SearchTerm + '%' OR
+                            B.fVouchno LIKE '%' + @SearchTerm + '%'
+                        ))
+                    AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
+                    AND (@ToDate IS NULL OR B.FVOUCHDT <= @ToDate)
+                ORDER BY 
+                    B.FVOUCHDT DESC
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@SearchTerm", (object)searchTerm ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@FromDate", (object)fromDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@ToDate", (object)toDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Offset", (pageNumber - 1) * pageSize);
+                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
+                        using (var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                results.Add(new
+                                {
+                                    PartyName = reader["FACNAME"].ToString(),
+                                    VoucherNo = reader["fVouchno"].ToString(),
+                                    ItemName = reader["fItemName"].ToString(),
+                                    Image = reader["fImage1"]?.ToString(),
+                                    Amount = reader["fAmount"],
+                                    VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
+                                    ProductId = reader["FproductID"],
+                                    TotalQty = reader["fTotQty"]
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return Ok(new
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Data = results
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
+        [HttpPut("MarkAsDelivered/{vouchNo}")]
+        public async Task<IActionResult> MarkOrderAsDelivered([FromRoute] string vouchNo)
         {
 
 
@@ -517,13 +337,13 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await con.OpenAsync();
 
                     var query = @"
-                UPDATE Orders 
-                SET DeliveryStatus = 'Delivered' 
-                WHERE OrderID = @orderId AND DeliveryStatus = 'Pending'";
+                    UPDATE BLEDGEROP 
+                    SET FORDERSTATUS = 'Y'
+                    WHERE fVouchno = @vouchNo ";
 
                     using (SqlCommand cmd = new SqlCommand(query, con))
                     {
-                        cmd.Parameters.AddWithValue("@orderId", orderId);
+                        cmd.Parameters.AddWithValue("@vouchNo", vouchNo);
 
                         int rowsAffected = await cmd.ExecuteNonQueryAsync();
 
@@ -537,6 +357,82 @@ namespace CHITSCHEME.Controllers.Jewellery
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal Server Error: {ex.Message}");
+            }
+        }
+
+
+
+
+        [HttpGet("OrderItems/{voucherNo}")]
+        public async Task<IActionResult> GetOrderItemsByVoucherNo([FromRoute] string voucherNo)
+        {
+            var result = new List<OrderItemDetailDto>();
+
+            try
+            {
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    await con.OpenAsync();
+
+                    // Step 1: Check delivery status
+                    string statusQuery = "SELECT FORDERSTATUS FROM BLEDGEROP WHERE fVouchno = @voucherNo";
+                    using (SqlCommand statusCmd = new SqlCommand(statusQuery, con))
+                    {
+                        statusCmd.Parameters.AddWithValue("@voucherNo", voucherNo);
+                        var statusResult = await statusCmd.ExecuteScalarAsync();
+
+                        if (statusResult == null)
+                        {
+                            return NotFound(new { message = "Order not found." });
+                        }
+
+                        string deliveryStatus = statusResult.ToString();
+
+                        if (deliveryStatus == "Y")
+                        {
+                            return BadRequest(new { message = $"Order is already delivered. Current status: {deliveryStatus}" });
+                        }
+                    }
+
+                    // Step 2: Fetch order items from ItemTransactionOP, ITEM, and ItemPurchaseOP
+                    string itemQuery = @"
+                SELECT 
+                    IT.fItemcode,
+                    I.fItemName,
+                    IT.fTotQty,
+                    IT.fAmount,
+                    IP.fImage1
+                FROM ItemTransactionOP IT
+                JOIN ITEM I ON I.fItemcode = IT.fItemcode
+                JOIN ItemPurchaseOP IP ON IT.FproductID = IP.fID
+                WHERE IT.fVoucher = @voucherNo";
+
+                    using (SqlCommand cmd = new SqlCommand(itemQuery, con))
+                    {
+                        cmd.Parameters.AddWithValue("@voucherNo", voucherNo);
+
+                        using (var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                result.Add(new OrderItemDetailDto
+                                {
+                                    ItemCode = reader["fItemcode"].ToString(),
+                                    FItemName = reader["fItemName"].ToString(),
+                                    Quantity = Convert.ToInt32(reader["fTotQty"]),
+                                    Price = Convert.ToDecimal(reader["fAmount"]),
+                                    IMAGE = reader["fImage1"] != DBNull.Value ? reader["fImage1"].ToString() : null
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return Ok(result);
             }
             catch (Exception ex)
             {

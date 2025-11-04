@@ -35,9 +35,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                         {
                             // 1. Get current max FVOUCHER number
                             string maxVoucherQuery = @"
-                                    SELECT ISNULL(MAX(CAST(SUBSTRING(FVOUCHER, 3, LEN(FVOUCHER)) AS INT)), 0) 
-                                    FROM itemtransactionop
-                                    WHERE FVOUCHER LIKE 'OD%'";
+                            
+                            SELECT ISNULL(MAX(CAST(SUBSTRING(fVouchno, 3, LEN(fVouchno)) AS INT)), 0) 
+                            FROM BLEDGEROP WHERE fvType ='OD'";
 
                             int maxVoucher = 0;
                             using (SqlCommand cmdMax = new SqlCommand(maxVoucherQuery, con, tran))
@@ -45,38 +45,39 @@ namespace CHITSCHEME.Controllers.Jewellery
                                 maxVoucher = Convert.ToInt32(await cmdMax.ExecuteScalarAsync());
                             }
 
-                            int nextVoucher = maxVoucher+1;
+                            int nextVoucher = maxVoucher + 1;
+                            string formattedVoucher = "OD" + nextVoucher.ToString("D5"); // Example: OD00001
+
+                            double totalAmount = 0;
+                            int totalQuantity = 0;
 
                             foreach (var item in order.Items)
                             {
+                                totalQuantity += item.Quantity;
+                                totalAmount += Convert.ToDouble(item.Price) * item.Quantity;
+
                                 // 2. Fetch data from itempurchaseop for given ItemCode + fid
                                 string selectQuery = @"
-                           
-
-                                    SELECT 
-                                         ip.Itemcode, 
-                                         ip.Qty AS fTotQty,
-                                         ip.Gms AS fGms,
-                                         ip.Mc AS fMcAmount,
-                                         ip.StnChrg AS fStnChrg,
-                                         ip.Wastage AS fWastage,
-                                         ip.fPrefix, 
-                                         ip.fBox, 
-                                         ip.Gross AS fGross,
-                                         ip.fSize, 
-                                         ip.fDiv, 
-                                         ip.fDescription AS fdesc,
-                                         ip.fDesign, 
-                                         ip.fSection, 
-                                         ip.fID,
-                                         d.fRate   -- include division rate
-                                    FROM itempurchaseop ip
-                                    JOIN Division d ON d.fCode = ip.fDiv
-                                    WHERE ip.Itemcode = @ItemCode AND ip.FID = @FID;
-
-
-
-                            ";
+                                SELECT 
+                                    ip.Itemcode, 
+                                    ip.Qty AS fTotQty,
+                                    ip.Gms AS fGms,
+                                    ip.Mc AS fMcAmount,
+                                    ip.StnChrg AS fStnChrg,
+                                    ip.Wastage AS fWastage,
+                                    ip.fPrefix, 
+                                    ip.fBox, 
+                                    ip.Gross AS fGross,
+                                    ip.fSize, 
+                                    ip.fDiv, 
+                                    ip.fDescription AS fdesc,
+                                    ip.fDesign, 
+                                    ip.fSection, 
+                                    ip.fID,
+                                    d.fRate
+                                FROM itempurchaseop ip
+                                JOIN Division d ON d.fCode = ip.fDiv
+                                WHERE ip.Itemcode = @ItemCode AND ip.FID = @FID;";
 
                                 DataTable dt = new DataTable();
                                 using (SqlCommand cmdSelect = new SqlCommand(selectQuery, con, tran))
@@ -92,26 +93,24 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                                 if (dt.Rows.Count == 0)
                                     continue; // skip if no match found
+
                                 // 3. Insert into itemtransactionop
                                 foreach (DataRow row in dt.Rows)
                                 {
-
                                     string insertQuery = @"
-                                        INSERT INTO itemtransactionop
-                                        (FVoucher, FItemcode, FType, fTotQty, fGms, fMcAmount, fStnChrg, fWastage, 
-                                         fPrefix, fBox, fGross, fSize, fDiv, fCode,fproductId,fRate)
-                                        VALUES
-                                        (@FVOUCHER, @FItemcode, @FTYpe, @fTotQty, @FGms, @FMcAmount, @FStnChrg, @FWastage,
-                                         @FPrefix, @FBox, @FGross, @FSize, @FDiv, @FCode,@productId,@fRate)";
-
+                                INSERT INTO itemtransactionop
+                                (FVoucher, FItemcode, FType, fTotQty, fGms, fMcAmount, fStnChrg, fWastage, 
+                                    fPrefix, fBox, fGross, fSize, fDiv, fCode, fproductId, fRate,FAMOUNT)
+                                VALUES
+                                (@FVOUCHER, @FItemcode, @FTYpe, @fTotQty, @FGms, @FMcAmount, @FStnChrg, @FWastage,
+                                    @FPrefix, @FBox, @FGross, @FSize, @FDiv, @FCode, @productId, @fRate,@FAMOUNT)";
 
                                     using (SqlCommand cmdInsert = new SqlCommand(insertQuery, con, tran))
                                     {
-                                        string formattedVoucher = "OD" + nextVoucher.ToString("D5"); // e.g., OD00001, OD00002
                                         cmdInsert.Parameters.AddWithValue("@FVOUCHER", formattedVoucher);
                                         cmdInsert.Parameters.AddWithValue("@FItemcode", row["Itemcode"].ToString());
                                         cmdInsert.Parameters.AddWithValue("@FTYpe", "OD");
-                                        cmdInsert.Parameters.AddWithValue("@fTotQty", 1);
+                                        cmdInsert.Parameters.AddWithValue("@fTotQty", item.Quantity);
                                         cmdInsert.Parameters.AddWithValue("@FGms", row["fGms"]);
                                         cmdInsert.Parameters.AddWithValue("@FMcAmount", row["fMcAmount"]);
                                         cmdInsert.Parameters.AddWithValue("@FStnChrg", row["fStnChrg"]);
@@ -124,16 +123,35 @@ namespace CHITSCHEME.Controllers.Jewellery
                                         cmdInsert.Parameters.AddWithValue("@FCode", item.ItemCode);
                                         cmdInsert.Parameters.AddWithValue("@productId", item.fid);
                                         cmdInsert.Parameters.AddWithValue("@fRate", row["fRate"]);
-
+                                        cmdInsert.Parameters.AddWithValue("@FAMOUNT",item.Price);
 
                                         await cmdInsert.ExecuteNonQueryAsync();
                                     }
-
                                 }
                             }
 
+                            // 4. Insert summary into BLEDGER
+                            string insertBledgerQuery = @"
+                            INSERT INTO BLEDGEROP (fCucode, fvtype, FVOUCHNO, FBILLAMT, FBILLTYPE, FVOUCHDT,FORDERSTATUS)
+                            VALUES (@CustomerCode, 'OD', @FVOUCHER, @FBILLAMOUNT, 'OD', GETDATE(),@FORDERSTATUS)";
+
+                            using (SqlCommand cmdBledger = new SqlCommand(insertBledgerQuery, con, tran))
+                            {
+                                cmdBledger.Parameters.AddWithValue("@CustomerCode", order.CustomerCode);
+                                cmdBledger.Parameters.AddWithValue("@FVOUCHER", formattedVoucher);
+                                cmdBledger.Parameters.AddWithValue("@FBILLAMOUNT", totalAmount);
+                                cmdBledger.Parameters.AddWithValue("@FORDERSTATUS", 'N');
+
+                                await cmdBledger.ExecuteNonQueryAsync();
+                            }
+                            string deleteCartQuery = "DELETE FROM cartlist WHERE fCusid = @CustomerCode";
+                            using (SqlCommand cmdDelete = new SqlCommand(deleteCartQuery, con, tran))
+                            {
+                                cmdDelete.Parameters.AddWithValue("@CustomerCode", order.CustomerCode);
+                                await cmdDelete.ExecuteNonQueryAsync();
+                            }
                             tran.Commit();
-                            return Ok(new { Message = "Order placed successfully." });
+                            return Ok(new { Message = "Order placed successfully.", VoucherNo = formattedVoucher });
                         }
                         catch (Exception ex)
                         {
@@ -148,6 +166,144 @@ namespace CHITSCHEME.Controllers.Jewellery
                 return StatusCode(500, $"Database error: {ex.Message}");
             }
         }
+
+
+
+
+
+
+        [HttpGet("customerdetails/{voucherNo}")]
+        public async Task<IActionResult> GetCustomerDetails(string voucherNo)
+        {
+            if (string.IsNullOrEmpty(voucherNo))
+                return BadRequest("Voucher number is required.");
+
+            try
+            {
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    await con.OpenAsync();
+
+                    string query = @"
+                	SELECT 
+                    p.facName AS Name,
+                    p.fStreet AS Street,
+                    p.fArea AS Area,
+                    p.fCity AS City,
+                    p.FSTAT AS State,
+                    p.fPhone AS Phone,
+                    p.fMail AS Email
+                FROM BLEDGEROP b
+                JOIN Party p ON p.fCode = b.fCucode
+                WHERE b.FVOUCHNO = @VoucherNo";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@VoucherNo", voucherNo);
+
+                        using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                var result = new
+                                {
+                                    Name = reader["Name"].ToString(),
+                                    Street = reader["Street"].ToString(),
+                                    Area = reader["Area"].ToString(),
+                                    City = reader["City"].ToString(),
+                                    State = reader["State"].ToString(),
+                                    Phone = reader["Phone"].ToString(),
+                                    Email = reader["Email"]?.ToString()
+                                };
+
+                                return Ok(result);
+                            }
+                            else
+                            {
+                                return NotFound("No customer found for the given voucher.");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Server error: {ex.Message}");
+            }
+        }
+
+
+
+
+
+        [HttpGet("itemdetails/{voucherNo}")]
+        public async Task<IActionResult> GetItemDetails(string voucherNo)
+        {
+            var itemDetails = new List<object>();
+
+            try
+            {
+                using (var connection = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    await connection.OpenAsync();
+
+                    var query = @"
+                SELECT
+                    i.fItemName,
+                    ip.fDescription AS descrip,
+                    it.fTotQty AS Qty,
+                    it.fGms AS Weight,
+                    it.FAMOUNT AS Price,
+                    it.fRate AS Rate,
+                    (it.FAMOUNT * 0.03) AS Tax, 
+                    (it.FAMOUNT + (it.FAMOUNT * 0.03)) AS Total
+                FROM itemtransactionop it
+                JOIN itempurchaseop ip ON ip.Itemcode = it.FItemcode AND ip.FID = it.fproductId
+                JOIN item i ON i.fItemcode = it.FItemcode
+                WHERE it.FVoucher = @VoucherNo";
+
+                    using (var command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@VoucherNo", voucherNo);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                itemDetails.Add(new
+                                {
+                                    ItemName = reader["fItemName"]?.ToString() ?? "",
+                                    Description = reader["descrip"]?.ToString() ?? "",
+                                    Quantity = reader["Qty"] != DBNull.Value ? Convert.ToDecimal(reader["Qty"]) : 0,
+                                    Weight = reader["Weight"] != DBNull.Value ? Convert.ToDecimal(reader["Weight"]) : 0,
+                                    Price = reader["Price"] != DBNull.Value ? Convert.ToDecimal(reader["Price"]) : 0,
+                                    Rate = reader["Rate"] != DBNull.Value ? Convert.ToDecimal(reader["Rate"]) : 0,
+                                    Tax = reader["Tax"] != DBNull.Value ? Convert.ToDecimal(reader["Tax"]) : 0,
+                                    Total = reader["Total"] != DBNull.Value ? Convert.ToDecimal(reader["Total"]) : 0
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return Ok(itemDetails);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
 
 
 
