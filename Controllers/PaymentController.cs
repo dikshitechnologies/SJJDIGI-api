@@ -6,13 +6,174 @@ using QRCoder;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using JEWELLBISREACT.DBConnection;
+using Razorpay.Api;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
+
 
 namespace CHITSCHEME.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class PaymentController : ControllerBase
     {
+        private readonly IConfiguration _config;
+
+        public PaymentController(IConfiguration config)
+        {
+            _config = config;
+        }
+
+        [HttpPost("create-order")]
+        public IActionResult CreateOrder([FromBody] valAmount amt)
+        {
+            try
+            {
+                if (amt.Amount <= 0)
+                    return BadRequest(new { message = "Amount must be greater than 0" });
+
+                string keyId = _config["Razorpay:KeyId"];
+                string keySecret = _config["Razorpay:KeySecret"];
+
+                var client = new Razorpay.Api.RazorpayClient(keyId, keySecret);
+
+                var options = new Dictionary<string, object>
+            {
+                { "amount", amt.Amount * 100 },
+                { "currency", "INR" }
+            };
+
+                var order = client.Order.Create(options);
+
+                return Ok(new { orderId = order["id"].ToString(), amount = amt.Amount });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error", error = ex.Message });
+            }
+        }
+
+        public class VerifyPaymentRequest
+        {
+            public string razorpay_order_id { get; set; }
+            public string razorpay_payment_id { get; set; }
+            public string razorpay_signature { get; set; }
+        }
+        
+        public class valAmount
+        {
+            public int Amount { get; set; }
+          
+        }
+
+        [HttpPost("verify-payment")]
+        public IActionResult VerifyPayment([FromBody] VerifyPaymentRequest req)
+        {
+            try
+            {
+                if (req == null ||
+                    string.IsNullOrWhiteSpace(req.razorpay_order_id) ||
+                    string.IsNullOrWhiteSpace(req.razorpay_payment_id) ||
+                    string.IsNullOrWhiteSpace(req.razorpay_signature))
+                {
+                    return BadRequest(new { message = "Invalid payment data" });
+                }
+
+                string keySecret = _config["Razorpay:KeySecret"];
+                string generatedSignature = GenerateSignature(req.razorpay_order_id, req.razorpay_payment_id, keySecret);
+
+                if (generatedSignature == req.razorpay_signature)
+                    return Ok(new { status = "success", message = "Payment verified successfully" });
+                else
+                    return BadRequest(new { status = "failed", message = "Payment verification failed" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error", error = ex.Message });
+            }
+        }
+
+        // 🔒 Private helper — will NOT appear in Swagger
+        private string GenerateSignature(string orderId, string paymentId, string secret)
+        {
+            string payload = orderId + "|" + paymentId;
+            using (var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret)))
+            {
+                byte[] hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload));
+                return BitConverter.ToString(hash).Replace("-", "").ToLower();
+            }
+        }
+
+
+        [HttpPost("record")]
+        public IActionResult RecordPayment([FromBody] PaymentRecordModel model)
+        {
+            try
+            {
+
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    string query = @"
+                    INSERT INTO PaymentRecords 
+                    (UserId, RazorpayOrderId, RazorpayPaymentId, RazorpaySignature, Amount, Currency, Status, Description, Email, Contact, PaymentTime, VerificationTime)
+                    VALUES
+                    (@UserId, @RazorpayOrderId, @RazorpayPaymentId, @RazorpaySignature, @Amount, @Currency, @Status, @Description, @Email, @Contact, GETDATE(), GETDATE())";
+
+                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    {
+                        cmd.Parameters.AddWithValue("@UserId", model.UserId);
+                        cmd.Parameters.AddWithValue("@RazorpayOrderId", model.RazorpayOrderId);
+                        cmd.Parameters.AddWithValue("@RazorpayPaymentId", model.RazorpayPaymentId);
+                        cmd.Parameters.AddWithValue("@RazorpaySignature", model.RazorpaySignature);
+                        cmd.Parameters.AddWithValue("@Amount", model.Amount);
+                        cmd.Parameters.AddWithValue("@Currency", model.Currency);
+                        cmd.Parameters.AddWithValue("@Status", model.Status);
+                        cmd.Parameters.AddWithValue("@Description", model.Description ?? (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Email", model.Email ?? (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Contact", model.Contact ?? (object)DBNull.Value);
+
+                        con.Open();
+                        cmd.ExecuteNonQuery();
+                        con.Close();
+                    }
+                }
+
+                return Ok(new { status = "success", message = "Payment record inserted successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { status = "failed", message = ex.Message });
+            }
+        }
+
+
+        public class PaymentRecordModel
+        {
+            public string UserId { get; set; }
+            public string RazorpayOrderId { get; set; }
+            public string RazorpayPaymentId { get; set; }
+            public string RazorpaySignature { get; set; }
+            public decimal Amount { get; set; }
+            public string Currency { get; set; }
+            public string Status { get; set; }
+            public string Description { get; set; }
+            public string Email { get; set; }
+            public string Contact { get; set; }
+        }
+
+
+
+
+
+
+
+
+
+
+
+        //=============================================================================================
 
         [HttpPost("verify")]
         public IActionResult Verify([FromBody] PaymentDto dto)
