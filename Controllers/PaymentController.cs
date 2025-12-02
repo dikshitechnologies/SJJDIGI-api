@@ -117,9 +117,9 @@ namespace CHITSCHEME.Controllers
                 {
                     string query = @"
                     INSERT INTO PaymentRecords 
-                    (UserId, RazorpayOrderId, RazorpayPaymentId, RazorpaySignature, Amount, Currency, Status, Description, Email, Contact, PaymentTime, VerificationTime)
+                    (UserId, RazorpayOrderId, RazorpayPaymentId, RazorpaySignature, Amount, Currency, Status, Description, Email, Contact, PaymentTime, VerificationTime,FpaymentType)
                     VALUES
-                    (@UserId, @RazorpayOrderId, @RazorpayPaymentId, @RazorpaySignature, @Amount, @Currency, @Status, @Description, @Email, @Contact, GETDATE(), GETDATE())";
+                    (@UserId, @RazorpayOrderId, @RazorpayPaymentId, @RazorpaySignature, @Amount, @Currency, @Status, @Description, @Email, @Contact, GETDATE(), GETDATE(),@FpaymentType)";
 
                     using (SqlCommand cmd = new SqlCommand(query, con))
                     {
@@ -133,6 +133,7 @@ namespace CHITSCHEME.Controllers
                         cmd.Parameters.AddWithValue("@Description", model.Description ?? (object)DBNull.Value);
                         cmd.Parameters.AddWithValue("@Email", model.Email ?? (object)DBNull.Value);
                         cmd.Parameters.AddWithValue("@Contact", model.Contact ?? (object)DBNull.Value);
+                        cmd.Parameters.AddWithValue("@FpaymentType",model.FpaymentType);
 
                         con.Open();
                         cmd.ExecuteNonQuery();
@@ -161,6 +162,7 @@ namespace CHITSCHEME.Controllers
             public string Description { get; set; }
             public string Email { get; set; }
             public string Contact { get; set; }
+            public string FpaymentType { get; set; }
         }
 
 
@@ -199,59 +201,59 @@ namespace CHITSCHEME.Controllers
         }
 
 
-        [HttpPost("SavePaymentResponse")]
-        public IActionResult SavePaymentResponse([FromBody] PaymentResponseDto request)
-        {
-            try
-            {
-                using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
-                {
-                    conn.Open();
-                    using (SqlCommand cmd = new SqlCommand(@"
-                INSERT INTO PaymentResponses (
-                    EasePayID, TxnID, Status, Result, Amount, PaymentMethod, CardType,
-                    CardNumber, BankName, IssuingBank, Mode, AuthCode, BankRefNum,
-                    Phone, Email, FirstName, AddedOn, PaymentSource, ProductInfo, ErrorMessage, RawResponse
-                )
-                VALUES (
-                    @EasePayID, @TxnID, @Status, @Result, @Amount, @PaymentMethod, @CardType,
-                    @CardNumber, @BankName, @IssuingBank, @Mode, @AuthCode, @BankRefNum,
-                    @Phone, @Email, @FirstName, @AddedOn, @PaymentSource, @ProductInfo, @ErrorMessage, @RawResponse
-                )", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@EasePayID", request.EasePayID ?? "");
-                        cmd.Parameters.AddWithValue("@TxnID", request.TxnID ?? "");
-                        cmd.Parameters.AddWithValue("@Status", request.Status ?? "");
-                        cmd.Parameters.AddWithValue("@Result", request.Result ?? "");
-                        cmd.Parameters.AddWithValue("@Amount", request.Amount);
-                        cmd.Parameters.AddWithValue("@PaymentMethod", request.PaymentMethod ?? "");
-                        cmd.Parameters.AddWithValue("@CardType", request.CardType ?? "");
-                        cmd.Parameters.AddWithValue("@CardNumber", request.CardNumber ?? "");
-                        cmd.Parameters.AddWithValue("@BankName", request.BankName ?? "");
-                        cmd.Parameters.AddWithValue("@IssuingBank", request.IssuingBank ?? "");
-                        cmd.Parameters.AddWithValue("@Mode", request.Mode ?? "");
-                        cmd.Parameters.AddWithValue("@AuthCode", request.AuthCode ?? "");
-                        cmd.Parameters.AddWithValue("@BankRefNum", request.BankRefNum ?? "");
-                        cmd.Parameters.AddWithValue("@Phone", request.Phone ?? "");
-                        cmd.Parameters.AddWithValue("@Email", request.Email ?? "");
-                        cmd.Parameters.AddWithValue("@FirstName", request.FirstName ?? "");
-                        cmd.Parameters.AddWithValue("@AddedOn", (object?)request.AddedOn ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@PaymentSource", request.PaymentSource ?? "");
-                        cmd.Parameters.AddWithValue("@ProductInfo", request.ProductInfo ?? "");
-                        cmd.Parameters.AddWithValue("@ErrorMessage", request.ErrorMessage ?? "");
-                        cmd.Parameters.AddWithValue("@RawResponse", request.RawResponse ?? "");
+        //[HttpPost("SavePaymentResponse")]
+        //public IActionResult SavePaymentResponse([FromBody] PaymentResponseDto request)
+        //{
+        //    try
+        //    {
+        //        using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+        //        {   
+        //            conn.Open();
+        //            using (SqlCommand cmd = new SqlCommand(@"
+        //        INSERT INTO PaymentResponses (
+        //            EasePayID, TxnID, Status, Result, Amount, PaymentMethod, CardType,
+        //            CardNumber, BankName, IssuingBank, Mode, AuthCode, BankRefNum,
+        //            Phone, Email, FirstName, AddedOn, PaymentSource, ProductInfo, ErrorMessage, RawResponse
+        //        )
+        //        VALUES (
+        //            @EasePayID, @TxnID, @Status, @Result, @Amount, @PaymentMethod, @CardType,
+        //            @CardNumber, @BankName, @IssuingBank, @Mode, @AuthCode, @BankRefNum,
+        //            @Phone, @Email, @FirstName, @AddedOn, @PaymentSource, @ProductInfo, @ErrorMessage, @RawResponse
+        //        )", conn))
+        //            {
+        //                cmd.Parameters.AddWithValue("@EasePayID", request.EasePayID ?? "");
+        //                cmd.Parameters.AddWithValue("@TxnID", request.TxnID ?? "");
+        //                cmd.Parameters.AddWithValue("@Status", request.Status ?? "");
+        //                cmd.Parameters.AddWithValue("@Result", request.Result ?? "");
+        //                cmd.Parameters.AddWithValue("@Amount", request.Amount);
+        //                cmd.Parameters.AddWithValue("@PaymentMethod", request.PaymentMethod ?? "");
+        //                cmd.Parameters.AddWithValue("@CardType", request.CardType ?? "");
+        //                cmd.Parameters.AddWithValue("@CardNumber", request.CardNumber ?? "");
+        //                cmd.Parameters.AddWithValue("@BankName", request.BankName ?? "");
+        //                cmd.Parameters.AddWithValue("@IssuingBank", request.IssuingBank ?? "");
+        //                cmd.Parameters.AddWithValue("@Mode", request.Mode ?? "");
+        //                cmd.Parameters.AddWithValue("@AuthCode", request.AuthCode ?? "");
+        //                cmd.Parameters.AddWithValue("@BankRefNum", request.BankRefNum ?? "");
+        //                cmd.Parameters.AddWithValue("@Phone", request.Phone ?? "");
+        //                cmd.Parameters.AddWithValue("@Email", request.Email ?? "");
+        //                cmd.Parameters.AddWithValue("@FirstName", request.FirstName ?? "");
+        //                cmd.Parameters.AddWithValue("@AddedOn", (object?)request.AddedOn ?? DBNull.Value);
+        //                cmd.Parameters.AddWithValue("@PaymentSource", request.PaymentSource ?? "");
+        //                cmd.Parameters.AddWithValue("@ProductInfo", request.ProductInfo ?? "");
+        //                cmd.Parameters.AddWithValue("@ErrorMessage", request.ErrorMessage ?? "");
+        //                cmd.Parameters.AddWithValue("@RawResponse", request.RawResponse ?? "");
 
-                        cmd.ExecuteNonQuery();
-                    }
-                }
+        //                cmd.ExecuteNonQuery();
+        //            }
+        //        }
 
-                return Ok(new { status = true, message = "Payment response saved successfully." });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { status = false, message = "Error saving payment response.", error = ex.Message });
-            }
-        }
+        //        return Ok(new { status = true, message = "Payment response saved successfully." });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return StatusCode(500, new { status = false, message = "Error saving payment response.", error = ex.Message });
+        //    }
+        //}
 
     }
 }
