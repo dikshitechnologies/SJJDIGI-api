@@ -205,18 +205,18 @@ namespace CHITSCHEME.Controllers
             try
             {
                 using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
-                {
+                {   
                     conn.Open();
                     using (SqlCommand cmd = new SqlCommand(@"
                 INSERT INTO PaymentResponses (
                     EasePayID, TxnID, Status, Result, Amount, PaymentMethod, CardType,
                     CardNumber, BankName, IssuingBank, Mode, AuthCode, BankRefNum,
-                    Phone, Email, FirstName, AddedOn, PaymentSource, ProductInfo, ErrorMessage, RawResponse
+                    Phone, Email, FirstName, AddedOn, PaymentSource, ProductInfo, ErrorMessage, RawResponse,FpaymentType
                 )
                 VALUES (
                     @EasePayID, @TxnID, @Status, @Result, @Amount, @PaymentMethod, @CardType,
                     @CardNumber, @BankName, @IssuingBank, @Mode, @AuthCode, @BankRefNum,
-                    @Phone, @Email, @FirstName, @AddedOn, @PaymentSource, @ProductInfo, @ErrorMessage, @RawResponse
+                    @Phone, @Email, @FirstName, @AddedOn, @PaymentSource, @ProductInfo, @ErrorMessage, @RawResponse,@FpaymentType
                 )", conn))
                     {
                         cmd.Parameters.AddWithValue("@EasePayID", request.EasePayID ?? "");
@@ -240,6 +240,7 @@ namespace CHITSCHEME.Controllers
                         cmd.Parameters.AddWithValue("@ProductInfo", request.ProductInfo ?? "");
                         cmd.Parameters.AddWithValue("@ErrorMessage", request.ErrorMessage ?? "");
                         cmd.Parameters.AddWithValue("@RawResponse", request.RawResponse ?? "");
+                        cmd.Parameters.AddWithValue("@FpaymentType", request.FpaymentType ?? "");
 
                         cmd.ExecuteNonQuery();
                     }
@@ -284,6 +285,7 @@ public class PaymentResponseDto
     public string ProductInfo { get; set; }
     public string ErrorMessage { get; set; }
     public string RawResponse { get; set; }
+    public string FpaymentType { get; set; }
 }
 
 public class PaymentDto
