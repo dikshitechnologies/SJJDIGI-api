@@ -68,7 +68,7 @@ namespace CHITSCHEME.Controllers
                 string userId = string.Empty;
 
                 var regDetailsCmd = new SqlCommand(
-                    "SELECT fcode, fAcname, fMail FROM party WHERE fparent like '000020000900015%' and fPhone= @phone",
+                    "SELECT fcode, fAcname, fMail,FPHONE FROM party WHERE fparent like '000020000900015%' and fPhone= @phone",
                     connection);
                 regDetailsCmd.Parameters.AddWithValue("@phone", request.Phone);
 
@@ -79,12 +79,13 @@ namespace CHITSCHEME.Controllers
                         userId = reader["fcode"].ToString();
                         username = reader["fAcname"].ToString();
                         email = reader["fMail"].ToString();
+                        partyPhone = reader["FPHONE"].ToString();
                     }
                 }
 
       
                 // -------- If party exists and already registered --------
-                if ((partyName != null && partyPhone != null) && userId != "")
+                if ((username != null && partyPhone != null) && userId != "")
                 {
                     var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
                     return Ok(new { token, UserPermission = "U", UserId = userId, username, email, phone=partyPhone });
