@@ -7,7 +7,6 @@ namespace CHITSCHEME.Controllers.Jewellery
 {
 
     [Route("api/[controller]")]
-    [Authorize]
     [ApiController]
     public class UploadController : ControllerBase
     {

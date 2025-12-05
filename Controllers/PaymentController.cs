@@ -31,7 +31,18 @@ namespace CHITSCHEME.Controllers
         {
             try
             {
-                if (amt.Amount <= 0)
+                if (amt == null || string.IsNullOrWhiteSpace(amt.Amount))
+                    return BadRequest(new { message = "Amount is required" });
+
+                // Convert string -> decimal
+                if (!decimal.TryParse(amt.Amount, System.Globalization.NumberStyles.Any,
+                                      System.Globalization.CultureInfo.InvariantCulture,
+                                      out decimal amountValue))
+                {
+                    return BadRequest(new { message = "Invalid amount format" });
+                }
+
+                if (amountValue <= 0)
                     return BadRequest(new { message = "Amount must be greater than 0" });
 
                 string keyId = _config["Razorpay:KeyId"];
@@ -40,20 +51,25 @@ namespace CHITSCHEME.Controllers
                 var client = new Razorpay.Api.RazorpayClient(keyId, keySecret);
 
                 var options = new Dictionary<string, object>
-            {
-                { "amount", amt.Amount * 100 },
-                { "currency", "INR" }
-            };
+        {
+            { "amount", (int)(amountValue * 100) },
+            { "currency", "INR" }
+        };
 
                 var order = client.Order.Create(options);
 
-                return Ok(new { orderId = order["id"].ToString(), amount = amt.Amount });
+                return Ok(new
+                {
+                    orderId = order["id"].ToString(),
+                    amount = amountValue
+                });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Error", error = ex.Message });
             }
         }
+
 
         public class VerifyPaymentRequest
         {
@@ -64,7 +80,7 @@ namespace CHITSCHEME.Controllers
         
         public class valAmount
         {
-            public int Amount { get; set; }
+            public string Amount { get; set; }
           
         }
 
