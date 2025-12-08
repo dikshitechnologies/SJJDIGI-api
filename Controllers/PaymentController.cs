@@ -34,7 +34,7 @@ namespace CHITSCHEME.Controllers
                 if (amt == null || string.IsNullOrWhiteSpace(amt.Amount))
                     return BadRequest(new { message = "Amount is required" });
 
-                // Convert string -> decimal
+                // Convert string → decimal safely
                 if (!decimal.TryParse(amt.Amount, System.Globalization.NumberStyles.Any,
                                       System.Globalization.CultureInfo.InvariantCulture,
                                       out decimal amountValue))
@@ -42,8 +42,14 @@ namespace CHITSCHEME.Controllers
                     return BadRequest(new { message = "Invalid amount format" });
                 }
 
+                // Validation
                 if (amountValue <= 0)
                     return BadRequest(new { message = "Amount must be greater than 0" });
+
+                // Your custom max limit
+                //decimal maxAmount = 1000000; // Example: 10 Lakhs
+                //if (amountValue > maxAmount)
+                //    return BadRequest(new { message = $"Amount cannot exceed {maxAmount} INR" });
 
                 string keyId = _config["Razorpay:KeyId"];
                 string keySecret = _config["Razorpay:KeySecret"];
@@ -52,12 +58,34 @@ namespace CHITSCHEME.Controllers
 
                 var options = new Dictionary<string, object>
         {
-            { "amount", (int)(amountValue * 100) },
+            { "amount", (int)(amountValue * 100) }, // amount in paise
             { "currency", "INR" }
         };
 
-                var order = client.Order.Create(options);
+                Razorpay.Api.Order order;
 
+                try
+                {
+                    // Razorpay call
+                    order = client.Order.Create(options);
+                }
+                catch (Razorpay.Api.Errors.BadRequestError ex)
+                {
+                    // Handles incorrect amount, currency issues, invalid key, etc.
+                    return BadRequest(new { message = "Razorpay Bad Request", error = ex.Message });
+                }
+                catch (Razorpay.Api.Errors.ServerError ex)
+                {
+                    // Handles Razorpay internal server problems
+                    return StatusCode(502, new { message = "Razorpay Server Error", error = ex.Message });
+                }
+                catch (Exception ex)
+                {
+                    // Fallback for any other unexpected Razorpay errors
+                    return StatusCode(500, new { message = "Unexpected Razorpay Error", error = ex.Message });
+                }
+
+                // If successful
                 return Ok(new
                 {
                     orderId = order["id"].ToString(),
@@ -66,10 +94,9 @@ namespace CHITSCHEME.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Error", error = ex.Message });
+                return StatusCode(500, new { message = "Internal Server Error", error = ex.Message });
             }
         }
-
 
         public class VerifyPaymentRequest
         {
