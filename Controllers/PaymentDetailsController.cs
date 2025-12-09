@@ -129,6 +129,7 @@ namespace CHITSCHEME.Controllers
                 string query = @"
             SELECT 
                 P.Id,
+                p.fvoucher,
                 P.FDate,
                 P.FchitCode,
                 ChitParty.fAcname AS ChitName,
@@ -136,12 +137,11 @@ namespace CHITSCHEME.Controllers
                 CusParty.fAcname AS CustomerName,
                 P.FWeight,
                 P.FAmount,
-                p.flag,
-               p.fvoucher
+                p.flag
             FROM PaymentDetails P
             LEFT JOIN Party AS ChitParty ON ChitParty.fCode = P.FchitCode
             LEFT JOIN Party AS CusParty ON CusParty.fCode = P.FcusCode
-            WHERE 1=1  and p.flag='N'  
+            WHERE 1=1  and p.flag='N'
             ";
 
                 // ✅ Add filters dynamically
@@ -156,7 +156,7 @@ namespace CHITSCHEME.Controllers
 
                 // ✅ Order + Pagination
                 query += @"
-            ORDER BY P.Id ASC
+            ORDER BY P.Id asc
             OFFSET @Offset ROWS
             FETCH NEXT @PageSize ROWS ONLY;
 
@@ -524,9 +524,8 @@ namespace CHITSCHEME.Controllers
 
         //-----------------------------------------------------------customer  delete details ------------------------------------
 
-
         [HttpDelete("DeletePaymentDetails")]
-        public IActionResult DeletePaymentDetails([FromBody] List<int> ids)
+        public IActionResult DeletePaymentDetails([FromBody] List<string> ids)
         {
             try
             {
@@ -542,35 +541,68 @@ namespace CHITSCHEME.Controllers
 
                 int rowsAffected = 0;
 
-                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+                using (SqlConnection con = new SqlConnection(DBHelper.GetConnection())) 
                 {
-                    using (SqlCommand cmd = new SqlCommand(query, con))
+                    con.Open();
+                    using (SqlTransaction tran = con.BeginTransaction())
                     {
-                        for (int i = 0; i < ids.Count; i++)
+                        try
                         {
-                            cmd.Parameters.AddWithValue($"@Id{i}", ids[i]);
-                        }
+                            foreach (var id in ids)
+                            {
+                                // 🔹 Step 1: Get fvoucher value for this PaymentDetails record
+                                string getVoucherQuery = "SELECT fvoucher FROM PaymentDetails WHERE Id = @Id";
+                                string fvoucher = id;
 
-                        con.Open();
-                        rowsAffected = cmd.ExecuteNonQuery();
+                               
+
+                                if (!string.IsNullOrEmpty(fvoucher))
+                                {
+                                    // 🔹 Step 2: Delete from ledger
+                                    using (SqlCommand ledgerCmd = new SqlCommand("DELETE FROM ledger WHERE fvrno = @fvoucher", con, tran))
+                                    {
+                                        ledgerCmd.Parameters.AddWithValue("@fvoucher", fvoucher);
+                                        rowsAffected +=ledgerCmd.ExecuteNonQuery();
+                                    }
+
+                                    // 🔹 Step 3: Delete from bledger
+                                    using (SqlCommand bledgerCmd = new SqlCommand("DELETE FROM bledger WHERE fVouchno = @fvoucher", con, tran))
+                                    {
+                                        bledgerCmd.Parameters.AddWithValue("@fvoucher", fvoucher);
+                                        rowsAffected += bledgerCmd.ExecuteNonQuery();
+                                    }
+
+                                    // 🔹 Step 4: Delete from PaymentDetails
+                                    using (SqlCommand payCmd = new SqlCommand("DELETE FROM PaymentDetails WHERE fvoucher = @fvoucher", con, tran))
+                                    {
+                                        payCmd.Parameters.AddWithValue("@fvoucher", fvoucher);
+                                        rowsAffected += payCmd.ExecuteNonQuery();
+                                    }
+                                }
+                            }
+
+                            tran.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            tran.Rollback();
+                            return BadRequest(new { Message = "Transaction failed.", Error = ex.Message });
+                        }
                     }
                 }
 
                 if (rowsAffected > 0)
                 {
-                    return Ok(new
-                    {
-                        Message = "Payment record(s) deleted successfully.",
-                    });
+                    return Ok(new { Message = "Payment details and related records deleted successfully." });
                 }
                 else
                 {
-                    return NotFound(new { Message = "No matching payment records found to delete." });
+                    return NotFound(new { Message = "No matching records found to delete." });
                 }
             }
             catch (Exception ex)
             {
-                return BadRequest(new { Message = "Error deleting payment record(s).", Error = ex.Message });
+                return BadRequest(new { Message = "Error deleting payment details.", Error = ex.Message });
             }
         }
 

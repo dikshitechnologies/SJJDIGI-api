@@ -26,7 +26,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 SET 
                     fStreet = @AddressLine,
                     fCity = @City,
-                    FSTAT = @State,
+                    farea = @State,
                     fPincode = @Pincode
                 WHERE fcode = @UserID";
 
