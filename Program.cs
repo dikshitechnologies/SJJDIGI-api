@@ -12,7 +12,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "CHITSCHEME",
+        Title = "MLVYS",
         Version = "v1"
     });
 
@@ -97,11 +97,11 @@ app.UseSwaggerUI(c =>
 
     if (env == Environments.Production)
     {
-        c.SwaggerEndpoint("/chitschemereact/swagger/v1/swagger.json", "CHITSCHEMEREACT v1");
+        c.SwaggerEndpoint("/MLVYS/swagger/v1/swagger.json", "MLVYS v1");
     }
     else
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "CHITSCHEMEREACT v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "MLVYS v1");
     }
 });
 
