@@ -346,7 +346,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     fimage4 = reader["FImage4"]?.ToString(),
                                     IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
                                     fID = reader["fid"]?.ToString(),
-                                    divisinNAEM = reader["fName"]?.ToString()
+                                    DiavisionName = reader["fName"]?.ToString()
                                 });
                             }
                         }
