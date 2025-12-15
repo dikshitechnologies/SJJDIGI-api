@@ -268,6 +268,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     op.FImage4,
                     d.fRate AS GoldRate,
                     op.fDate,
+                     d.fName,
                     CASE WHEN w.fProductCode IS NOT NULL THEN 'Y' ELSE 'N' END AS IsWishlist
                 FROM ITEMPURCHASEOP op
                 JOIN item i ON i.fItemcode = op.Itemcode
@@ -344,7 +345,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     fimage3 = reader["FImage3"]?.ToString(),
                                     fimage4 = reader["FImage4"]?.ToString(),
                                     IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
-                                    fID = reader["fid"]?.ToString()
+                                    fID = reader["fid"]?.ToString(),
+                                    DiavisionName = reader["fName"]?.ToString()
                                 });
                             }
                         }

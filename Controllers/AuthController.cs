@@ -36,9 +36,20 @@ namespace CHITSCHEME.Controllers
 
             try
             {
+                var divisions = new List<object>();
                 var connectionString = DBHelper.GetConnection();
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
+
+                var responseDivisions = new
+                {
+                    divisions = new
+                    {
+                        gold = new List<object>(),
+                        silver = new List<object>()
+                    }
+                };
+
 
                 // -------- Check Party --------
                 string partyName = null;
@@ -82,13 +93,56 @@ namespace CHITSCHEME.Controllers
                         partyPhone = reader["FPHONE"].ToString();
                     }
                 }
+                if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(partyPhone))
+                {
+                 
 
-      
+                    // Fetch Division Data
+                    var divisionCmd = new SqlCommand(
+                        @"SELECT fCode, fName, fRate 
+            FROM Division 
+           WHERE fCode IN ('0003','0002','0014','0004','0005')",
+                        connection);
+
+                    using (var reader = await divisionCmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string code = reader["fCode"].ToString();
+                            string name = reader["fName"].ToString();
+                            decimal rate = Convert.ToDecimal(reader["fRate"]);
+
+                            // GOLD: 14K, 18K, 22K, 24K
+                            if (code == "0003" || code == "0002" || code == "0014" || code == "0004")
+                            {
+                                responseDivisions.divisions.gold.Add(new
+                                {
+                                    name = name,
+                                    rate = rate
+                                });
+                            }
+
+                            // SILVER
+                            if (code == "0005")
+                            {
+                                responseDivisions.divisions.silver.Add(new
+                                {
+                                    name = name,
+                                    rate = rate
+                                });
+                            }
+                        }
+                    }
+
+                   
+                }
+
+
                 // -------- If party exists and already registered --------
                 if ((username != null && partyPhone != null) && userId != "")
                 {
                     var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "U", UserId = userId, username, email, phone=partyPhone });
+                    return Ok(new { token, UserPermission = "U", UserId = userId, username, email, phone=partyPhone, responseDivisions });
                 }
 
            
@@ -125,10 +179,61 @@ namespace CHITSCHEME.Controllers
 
             try
             {
+
+                var responseDivisions = new
+                {
+                    divisions = new
+                    {
+                        gold = new List<object>(),
+                        silver = new List<object>()
+                    }
+                };
+
+
+
+
+
                 var connectionString = DBHelper.GetConnection();
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
+
+                // Fetch Division Data
+                var divisionCmd = new SqlCommand(
+                    @"SELECT fCode, fName, fRate 
+            FROM Division 
+           WHERE fCode IN ('0003','0002','0014','0004','0005')",
+                    connection);
+
+                using (var reader1 = await divisionCmd.ExecuteReaderAsync())
+                {
+                    while (await reader1.ReadAsync())
+                    {
+                        string code = reader1["fCode"].ToString();
+                        string name = reader1["fName"].ToString();
+                        decimal rate = Convert.ToDecimal(reader1["fRate"]);
+
+                        // GOLD: 14K, 18K, 22K, 24K
+                        if (code == "0003" || code == "0002" || code == "0014" || code == "0004")
+                        {
+                            responseDivisions.divisions.gold.Add(new
+                            {
+                                name = name,
+                                rate = rate
+                            });
+                        }
+
+                        // SILVER
+                        if (code == "0005")
+                        {
+                            responseDivisions.divisions.silver.Add(new
+                            {
+                                name = name,
+                                rate = rate
+                            });
+                        }
+                    }
+                }
                 // ✅ Updated: Select more columns
                 var cmd = new SqlCommand(@"
             SELECT TOP 1 FCOMPCODE, FADMIN, PHONE1
@@ -139,6 +244,7 @@ namespace CHITSCHEME.Controllers
                 cmd.Parameters.AddWithValue("@password", password);
 
                 using var reader = await cmd.ExecuteReaderAsync();
+
 
                 if (await reader.ReadAsync())
                 {
@@ -156,7 +262,8 @@ namespace CHITSCHEME.Controllers
                         UserPermission = "A",
                         UserId = fcompcode,
                         AdminName = adminName,
-                        Phone = phone
+                        Phone = phone,
+                        responseDivisions
                     });
                 }
                 else
@@ -172,10 +279,63 @@ namespace CHITSCHEME.Controllers
 
         [AllowAnonymous]
         [HttpPost("guest-login")]
-        public IActionResult GuestLogin()
+        public async Task<IActionResult> GuestLogin()
         {
             try
             {
+
+
+                var responseDivisions = new
+                {
+                    divisions = new
+                    {
+                        gold = new List<object>(),
+                        silver = new List<object>()
+                    }
+                };
+
+                var connectionString = DBHelper.GetConnection();
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // Fetch Division Data
+                var divisionCmd = new SqlCommand(
+                    @"SELECT fCode, fName, fRate 
+            FROM Division 
+           WHERE fCode IN ('0003','0002','0014','0004','0005')",
+                    connection);
+
+                using (var reader = await divisionCmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        string code = reader["fCode"].ToString();
+                        string name = reader["fName"].ToString();
+                        decimal rate = Convert.ToDecimal(reader["fRate"]);
+
+                        // GOLD: 14K, 18K, 22K, 24K
+                        if (code == "0003" || code == "0002" || code == "0014" || code == "0004")
+                        {
+                            responseDivisions.divisions.gold.Add(new
+                            {
+                                name = name,
+                                rate = rate
+                            });
+                        }
+
+                        // SILVER
+                        if (code == "0005")
+                        {
+                            responseDivisions.divisions.silver.Add(new
+                            {
+                                name = name,
+                                rate = rate
+                            });
+                        }
+                    }
+                }
+
+
                 // Generate a random GuestId
                 string guestId = Guid.NewGuid().ToString("N").Substring(0, 10);
 
@@ -189,7 +349,8 @@ namespace CHITSCHEME.Controllers
                     UserPermission = "G",
                     GuestId = guestId,
                     username = "Guest User",
-                    email = ""
+                    email = "",
+                    responseDivisions
                 });
             }
             catch (Exception ex)
