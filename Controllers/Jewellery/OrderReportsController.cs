@@ -278,7 +278,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                             B.fVouchno LIKE '%' + @SearchTerm + '%'
                         ))
                     AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
-                    AND (@ToDate IS NULL OR B.FVOUCHDT <= @ToDate)
+                    AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
+
                 ORDER BY 
                     B.FVOUCHDT DESC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
