@@ -113,11 +113,19 @@ namespace CHITSCHEME.Controllers
                             decimal rate = Convert.ToDecimal(reader["fRate"]);
 
                             // GOLD: 14K, 18K, 22K, 24K
-                            if (code == "0003" || code == "0002" || code == "0014" || code == "0004")
+                            //if (code == "0003" || code == "0002" || code == "0014" || code == "0004")
+                            //{
+                            //    responseDivisions.divisions.gold.Add(new
+                            //    {
+                            //        name = name,
+                            //        rate = rate
+                            //    });
+                            //}
+                            if (code == "0002" )
                             {
                                 responseDivisions.divisions.gold.Add(new
                                 {
-                                    name = name,
+                                    name = "22K",
                                     rate = rate
                                 });
                             }
@@ -127,7 +135,7 @@ namespace CHITSCHEME.Controllers
                             {
                                 responseDivisions.divisions.silver.Add(new
                                 {
-                                    name = name,
+                                    name = "SILVER",
                                     rate = rate
                                 });
                             }
