@@ -36,8 +36,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                     IT.fAmount,
                     B.FVOUCHDT,
                     IT.FproductID,
-                    IT.fTotQty
-                FROM BLEDGEROP B  
+                    IT.fTotQty,
+                    B.FONLINE
+                FROM BLEDGER B  
                 JOIN ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
                 JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
                 JOIN ITEM I ON I.fItemcode = IT.fItemcode 
@@ -63,7 +64,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     VoucherDate = reader["FVOUCHDT"] != DBNull.Value ? Convert.ToDateTime(reader["FVOUCHDT"]) : (DateTime?)null,
                                     ProductId = reader["FproductID"]?.ToString(),
                                     TotalQty = reader["fTotQty"] != DBNull.Value ? Convert.ToInt32(reader["fTotQty"]) : 0,
-                                    orderStatus = "Pending"
+                                    orderStatus = "Pending",
+                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
 
@@ -98,8 +100,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                     IT.fAmount,
                     B.FVOUCHDT,
                     IT.FproductID,
-                    IT.fTotQty
-                FROM BLEDGEROP B  
+                    IT.fTotQty,
+                    B.FONLINE
+                FROM BLEDGER B  
                 JOIN ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
                 JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
                 JOIN ITEM I ON I.fItemcode = IT.fItemcode 
@@ -125,7 +128,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     VoucherDate = reader["FVOUCHDT"] != DBNull.Value ? Convert.ToDateTime(reader["FVOUCHDT"]) : (DateTime?)null,
                                     ProductId = reader["FproductID"]?.ToString(),
                                     TotalQty = reader["fTotQty"] != DBNull.Value ? Convert.ToInt32(reader["fTotQty"]) : 0,
-                                    orderStatus = "Delivered"
+                                    orderStatus = "Delivered",
+                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
 
@@ -166,9 +170,10 @@ namespace CHITSCHEME.Controllers.Jewellery
                     IT.fAmount, 
                     B.FVOUCHDT, 
                     IT.FproductID, 
-                    IT.fTotQty
+                    IT.fTotQty,
+                    B.FONLINE
                 FROM 
-                    BLEDGEROP B  
+                    BLEDGER B  
                 JOIN 
                     ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
                 JOIN 
@@ -212,7 +217,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     Amount = reader["fAmount"],
                                     VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
                                     ProductId = reader["FproductID"],
-                                    TotalQty = reader["fTotQty"]
+                                    TotalQty = reader["fTotQty"],
+                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
                         }
@@ -258,9 +264,10 @@ namespace CHITSCHEME.Controllers.Jewellery
                     IT.fAmount, 
                     B.FVOUCHDT, 
                     IT.FproductID, 
-                    IT.fTotQty
+                    IT.fTotQty,
+                    FONLINE
                 FROM 
-                    BLEDGEROP B  
+                    BLEDGER B  
                 JOIN 
                     ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
                 JOIN 
@@ -305,7 +312,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     Amount = reader["fAmount"],
                                     VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
                                     ProductId = reader["FproductID"],
-                                    TotalQty = reader["fTotQty"]
+                                    TotalQty = reader["fTotQty"],
+                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
                         }
@@ -338,7 +346,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await con.OpenAsync();
 
                     var query = @"
-                    UPDATE BLEDGEROP 
+                    UPDATE BLEDGER 
                     SET FORDERSTATUS = 'Y'
                     WHERE fVouchno = @vouchNo ";
 
@@ -380,7 +388,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await con.OpenAsync();
 
                     // Step 1: Check delivery status
-                    string statusQuery = "SELECT FORDERSTATUS FROM BLEDGEROP WHERE fVouchno = @voucherNo";
+                    string statusQuery = "SELECT FORDERSTATUS FROM BLEDGER WHERE fVouchno = @voucherNo";
                     using (SqlCommand statusCmd = new SqlCommand(statusQuery, con))
                     {
                         statusCmd.Parameters.AddWithValue("@voucherNo", voucherNo);

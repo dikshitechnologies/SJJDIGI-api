@@ -37,7 +37,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                             string maxVoucherQuery = @"
                             
                             SELECT ISNULL(MAX(CAST(SUBSTRING(fVouchno, 3, LEN(fVouchno)) AS INT)), 0) 
-                            FROM BLEDGEROP WHERE fvType ='OD'";
+                            FROM BLEDGER WHERE fvType ='OD'";
 
                             int maxVoucher = 0;
                             using (SqlCommand cmdMax = new SqlCommand(maxVoucherQuery, con, tran))
@@ -132,8 +132,8 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                             // 4. Insert summary into BLEDGER
                             string insertBledgerQuery = @"
-                            INSERT INTO BLEDGEROP (fCucode, fvtype, FVOUCHNO, FBILLAMT, FBILLTYPE, FVOUCHDT,FORDERSTATUS)
-                            VALUES (@CustomerCode, 'OD', @FVOUCHER, @FBILLAMOUNT, 'OD', GETDATE(),@FORDERSTATUS)";
+                            INSERT INTO BLEDGER (fCucode, fvtype, FVOUCHNO, FBILLAMT, FBILLTYPE, FVOUCHDT,FORDERSTATUS,FONLINE)
+                            VALUES (@CustomerCode, 'OD', @FVOUCHER, @FBILLAMOUNT, 'OD', GETDATE(),@FORDERSTATUS,@FONLINE)";
 
                             using (SqlCommand cmdBledger = new SqlCommand(insertBledgerQuery, con, tran))
                             {
@@ -141,6 +141,18 @@ namespace CHITSCHEME.Controllers.Jewellery
                                 cmdBledger.Parameters.AddWithValue("@FVOUCHER", formattedVoucher);
                                 cmdBledger.Parameters.AddWithValue("@FBILLAMOUNT", totalAmount);
                                 cmdBledger.Parameters.AddWithValue("@FORDERSTATUS", 'N');
+                                if (order.PaymentMethod.ToUpper() == "COD")
+                                {
+                                    cmdBledger.Parameters.AddWithValue("@FONLINE", "N");  //N Cash on Delivery
+                                }
+                                else if (order.PaymentMethod.ToUpper() == "ONLINE")
+                                {
+                                    cmdBledger.Parameters.AddWithValue("@FONLINE", "Y");  //Y Have online payment
+                                }
+                                else
+                                {
+                                    cmdBledger.Parameters.AddWithValue("@FONLINE", "I");  // Default to N
+                                }
 
                                 await cmdBledger.ExecuteNonQueryAsync();
                             }
@@ -193,7 +205,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     p.FSTAT AS State,
                     p.fPhone AS Phone,
                     p.fMail AS Email
-                FROM BLEDGEROP b
+                FROM BLEDGER b
                 JOIN Party p ON p.fCode = b.fCucode
                 WHERE b.FVOUCHNO = @VoucherNo";
 
@@ -309,73 +321,73 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
 
-        [HttpPost("placeOrder")] 
-        public async Task<IActionResult> PlaceOrder([FromBody] OrderModel order)
-        {
-            if (order == null || order.Items == null || !order.Items.Any())
-                return BadRequest("Invalid order data.");
+        //[HttpPost("placeOrder")] 
+        //public async Task<IActionResult> PlaceOrder([FromBody] OrderModel order)
+        //{
+        //    if (order == null || order.Items == null || !order.Items.Any())
+        //        return BadRequest("Invalid order data.");
 
 
 
 
-            using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
-            {
-                await conn.OpenAsync();
+        //    using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+        //    {
+        //        await conn.OpenAsync();
 
-                SqlTransaction transaction = conn.BeginTransaction();
+        //        SqlTransaction transaction = conn.BeginTransaction();
 
-                try
-                {
-                    // Insert into Orders table
-                    string insertOrderQuery = @"
-                    INSERT INTO Orders 
-                    (CustomerCode, DeliveryAddress, City, State, Pincode, PaymentMethod, OrderDate)
-                    VALUES (@CustomerCode, @DeliveryAddress, @City, @State, @Pincode, @PaymentMethod, GETDATE());
-                    SELECT SCOPE_IDENTITY();";
+        //        try
+        //        {
+        //            // Insert into Orders table
+        //            string insertOrderQuery = @"
+        //            INSERT INTO Orders 
+        //            (CustomerCode, DeliveryAddress, City, State, Pincode, PaymentMethod, OrderDate)
+        //            VALUES (@CustomerCode, @DeliveryAddress, @City, @State, @Pincode, @PaymentMethod, GETDATE());
+        //            SELECT SCOPE_IDENTITY();";
 
-                    SqlCommand cmdOrder = new SqlCommand(insertOrderQuery, conn, transaction);
-                    cmdOrder.Parameters.AddWithValue("@CustomerCode", order.CustomerCode);
-                    cmdOrder.Parameters.AddWithValue("@DeliveryAddress", order.DeliveryAddress);
-                    cmdOrder.Parameters.AddWithValue("@City", order.City);
-                    cmdOrder.Parameters.AddWithValue("@State", order.State);
-                    cmdOrder.Parameters.AddWithValue("@Pincode", order.Pincode);
-                    cmdOrder.Parameters.AddWithValue("@PaymentMethod", order.PaymentMethod);
+        //            SqlCommand cmdOrder = new SqlCommand(insertOrderQuery, conn, transaction);
+        //            cmdOrder.Parameters.AddWithValue("@CustomerCode", order.CustomerCode);
+        //            cmdOrder.Parameters.AddWithValue("@DeliveryAddress", order.DeliveryAddress);
+        //            cmdOrder.Parameters.AddWithValue("@City", order.City);
+        //            cmdOrder.Parameters.AddWithValue("@State", order.State);
+        //            cmdOrder.Parameters.AddWithValue("@Pincode", order.Pincode);
+        //            cmdOrder.Parameters.AddWithValue("@PaymentMethod", order.PaymentMethod);
 
-                    int orderId = Convert.ToInt32(await cmdOrder.ExecuteScalarAsync());
+        //            int orderId = Convert.ToInt32(await cmdOrder.ExecuteScalarAsync());
 
-                    // Insert items into OrderItems table
-                    foreach (var item in order.Items)
-                    {
-                        string insertItemQuery = @"
-                        INSERT INTO OrderItems (OrderID, ItemCode, Quantity, Price)
-                        VALUES (@OrderID, @ItemCode, @Quantity, @Price);";
+        //            // Insert items into OrderItems table
+        //            foreach (var item in order.Items)
+        //            {
+        //                string insertItemQuery = @"
+        //                INSERT INTO OrderItems (OrderID, ItemCode, Quantity, Price)
+        //                VALUES (@OrderID, @ItemCode, @Quantity, @Price);";
 
-                        SqlCommand cmdItem = new SqlCommand(insertItemQuery, conn, transaction);
-                        cmdItem.Parameters.AddWithValue("@OrderID", orderId);
-                        cmdItem.Parameters.AddWithValue("@ItemCode", item.ItemCode);
-                        cmdItem.Parameters.AddWithValue("@Quantity", item.Quantity);
-                        cmdItem.Parameters.AddWithValue("@Price", item.Price);
-                        await cmdItem.ExecuteNonQueryAsync();
+        //                SqlCommand cmdItem = new SqlCommand(insertItemQuery, conn, transaction);
+        //                cmdItem.Parameters.AddWithValue("@OrderID", orderId);
+        //                cmdItem.Parameters.AddWithValue("@ItemCode", item.ItemCode);
+        //                cmdItem.Parameters.AddWithValue("@Quantity", item.Quantity);
+        //                cmdItem.Parameters.AddWithValue("@Price", item.Price);
+        //                await cmdItem.ExecuteNonQueryAsync();
 
 
 
-                        string deleteCartQuery = "DELETE FROM cartlist WHERE fCusid = @CustomerCode AND fProductCode = @ItemCode";
-                        SqlCommand cmdDeleteCart = new SqlCommand(deleteCartQuery, conn, transaction);
-                        cmdDeleteCart.Parameters.AddWithValue("@CustomerCode", order.CustomerCode);
-                        cmdDeleteCart.Parameters.AddWithValue("@ItemCode", item.ItemCode);
-                        await cmdDeleteCart.ExecuteNonQueryAsync();
-                    }
+        //                string deleteCartQuery = "DELETE FROM cartlist WHERE fCusid = @CustomerCode AND fProductCode = @ItemCode";
+        //                SqlCommand cmdDeleteCart = new SqlCommand(deleteCartQuery, conn, transaction);
+        //                cmdDeleteCart.Parameters.AddWithValue("@CustomerCode", order.CustomerCode);
+        //                cmdDeleteCart.Parameters.AddWithValue("@ItemCode", item.ItemCode);
+        //                await cmdDeleteCart.ExecuteNonQueryAsync();
+        //            }
 
-                    transaction.Commit();
-                    return Ok(new { Message = "Order placed successfully", OrderId = orderId });
-                }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    return StatusCode(500, new { Message = "Order failed", Error = ex.Message });
-                }
-            }
-        }
+        //            transaction.Commit();
+        //            return Ok(new { Message = "Order placed successfully", OrderId = orderId });
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            transaction.Rollback();
+        //            return StatusCode(500, new { Message = "Order failed", Error = ex.Message });
+        //        }
+        //    }
+        //}
 
 
         [HttpGet("GetOrderReport/{customerCode}")]
@@ -441,6 +453,7 @@ namespace CHITSCHEME.Controllers.Jewellery
 public class OrderModel
 {
     public string CustomerCode { get; set; }
+
     public string DeliveryAddress { get; set; }
     public string City { get; set; }
     public string State { get; set; }
