@@ -231,7 +231,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
                                     ProductId = reader["FproductID"],
                                     TotalQty = reader["fTotQty"],
-                                    PaymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
+                                    PaymentType = reader["FPAYMENTTYPE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
                         }
@@ -338,7 +338,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
                                     ProductId = reader["FproductID"],
                                     TotalQty = reader["fTotQty"],
-                                    PaymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
+                                    PaymentType = reader["FPAYMENTTYPE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
                         }
