@@ -37,7 +37,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     B.FVOUCHDT,
                     IT.FproductID,
                     IT.fTotQty,
-                    B.FONLINE
+                    B.FPAYMENTTYPE 
                 FROM BLEDGER B  
                 JOIN ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
                 JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
@@ -65,7 +65,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     ProductId = reader["FproductID"]?.ToString(),
                                     TotalQty = reader["fTotQty"] != DBNull.Value ? Convert.ToInt32(reader["fTotQty"]) : 0,
                                     orderStatus = "Pending",
-                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
+                                    paymentType = reader["FPAYMENTTYPE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
 
@@ -101,7 +101,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     B.FVOUCHDT,
                     IT.FproductID,
                     IT.fTotQty,
-                    B.FONLINE
+                    B.FPAYMENTTYPE
                 FROM BLEDGER B  
                 JOIN ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
                 JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
@@ -129,7 +129,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     ProductId = reader["FproductID"]?.ToString(),
                                     TotalQty = reader["fTotQty"] != DBNull.Value ? Convert.ToInt32(reader["fTotQty"]) : 0,
                                     orderStatus = "Delivered",
-                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
+                                    paymentType = reader["FPAYMENTTYPE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
 
@@ -144,14 +144,14 @@ namespace CHITSCHEME.Controllers.Jewellery
             }
         }
 
-
         [HttpGet("pending-orders-admin")]
         public async Task<IActionResult> GetPendingOrders(
-        string? searchTerm,
-        DateTime? fromDate,
-        DateTime? toDate,
-        int pageNumber = 1,
-        int pageSize = 50)
+            string? searchTerm,
+            DateTime? fromDate,
+            DateTime? toDate,
+            string? paymentType,   // COD | ONLINE | null
+            int pageNumber = 1,
+            int pageSize = 50)
         {
             try
             {
@@ -162,55 +162,68 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await conn.OpenAsync();
 
                     string query = @"
-                SELECT 
-                    P.FACNAME, 
-                    B.fVouchno, 
-                    I.fItemName, 
-                    IP.fImage1, 
-                    IT.fAmount, 
-                    B.FVOUCHDT, 
-                    IT.FproductID, 
-                    IT.fTotQty,
-                    B.FONLINE
-                FROM 
-                    BLEDGER B  
-                JOIN 
-                    ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
-                JOIN 
-                    ItemPurchaseOP IP ON IP.fID = IT.FproductID
-                JOIN 
-                    PARTY P ON P.FCODE = B.fCucode 
-                JOIN 
-                    ITEM I ON I.fItemcode = IT.fItemcode 
-                WHERE 
-                    B.fvType = 'OD' 
-                    AND B.FORDERSTATUS = 'N'
-                    AND (@SearchTerm IS NULL OR (
-                            P.FACNAME LIKE '%' + @SearchTerm + '%' OR
-                            I.fItemName LIKE '%' + @SearchTerm + '%' OR
-                            B.fVouchno LIKE '%' + @SearchTerm + '%'
-                        ))
-                    AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
-                    AND (@ToDate IS NULL OR B.FVOUCHDT <= @ToDate)
-                ORDER BY 
-                    B.FVOUCHDT DESC
-                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            SELECT 
+                P.FACNAME, 
+                p.fPhone,
+                B.fVouchno, 
+                I.fItemName, 
+                IP.fImage1, 
+                IT.fAmount, 
+                B.FVOUCHDT, 
+                IT.FproductID, 
+                IT.fTotQty,
+                B.FPAYMENTTYPE
+            FROM 
+                BLEDGER B  
+            JOIN 
+                ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+            JOIN 
+                ItemPurchaseOP IP ON IP.fID = IT.FproductID
+            JOIN 
+                PARTY P ON P.FCODE = B.fCucode 
+            JOIN 
+                ITEM I ON I.fItemcode = IT.fItemcode 
+            WHERE 
+                B.fvType = 'OD' 
+                AND B.FPAYMENTTYPE = 'N'
+
+                AND (
+                    @PaymentType IS NULL OR
+                    (@PaymentType = 'COD' AND B.FPAYMENTTYPE = 'N') OR
+                    (@PaymentType = 'ONLINE' AND B.FPAYMENTTYPE = 'Y')
+                )
+
+                AND (
+                    @SearchTerm IS NULL OR
+                    P.FACNAME LIKE '%' + @SearchTerm + '%' OR
+                    I.fItemName LIKE '%' + @SearchTerm + '%' OR
+                    B.fVouchno LIKE '%' + @SearchTerm + '%'
+                )
+
+                AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
+                AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
+
+            ORDER BY 
+                B.FVOUCHDT DESC
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
                         cmd.Parameters.AddWithValue("@SearchTerm", (object)searchTerm ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@FromDate", (object)fromDate ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@ToDate", (object)toDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@PaymentType", (object)paymentType ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@Offset", (pageNumber - 1) * pageSize);
                         cmd.Parameters.AddWithValue("@PageSize", pageSize);
 
-                        using (var reader = await cmd.ExecuteReaderAsync())
+                        using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
                                 results.Add(new
                                 {
                                     PartyName = reader["FACNAME"].ToString(),
+                                    fPhone = reader["fPhone"].ToString(),
                                     VoucherNo = reader["fVouchno"].ToString(),
                                     ItemName = reader["fItemName"].ToString(),
                                     Image = reader["fImage1"]?.ToString(),
@@ -218,7 +231,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
                                     ProductId = reader["FproductID"],
                                     TotalQty = reader["fTotQty"],
-                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
+                                    PaymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
                         }
@@ -238,14 +251,14 @@ namespace CHITSCHEME.Controllers.Jewellery
             }
         }
 
-
         [HttpGet("Delivered-orders-admin")]
         public async Task<IActionResult> GetDeliveredOrders(
-        string? searchTerm,
-        DateTime? fromDate,
-        DateTime? toDate,
-        int pageNumber = 1,
-        int pageSize = 50)
+            string? searchTerm,
+            DateTime? fromDate,
+            DateTime? toDate,
+            string? paymentType,   // COD | ONLINE | null
+            int pageNumber = 1,
+            int pageSize = 50)
         {
             try
             {
@@ -256,56 +269,68 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await conn.OpenAsync();
 
                     string query = @"
-                SELECT 
-                    P.FACNAME, 
-                    B.fVouchno, 
-                    I.fItemName, 
-                    IP.fImage1, 
-                    IT.fAmount, 
-                    B.FVOUCHDT, 
-                    IT.FproductID, 
-                    IT.fTotQty,
-                    FONLINE
-                FROM 
-                    BLEDGER B  
-                JOIN 
-                    ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
-                JOIN 
-                    ItemPurchaseOP IP ON IP.fID = IT.FproductID
-                JOIN 
-                    PARTY P ON P.FCODE = B.fCucode 
-                JOIN 
-                    ITEM I ON I.fItemcode = IT.fItemcode 
-                WHERE 
-                    B.fvType = 'OD' 
-                    AND B.FORDERSTATUS = 'Y'
-                    AND (@SearchTerm IS NULL OR (
-                            P.FACNAME LIKE '%' + @SearchTerm + '%' OR
-                            I.fItemName LIKE '%' + @SearchTerm + '%' OR
-                            B.fVouchno LIKE '%' + @SearchTerm + '%'
-                        ))
-                    AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
-                    AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
+            SELECT 
+                P.FACNAME, 
+                p.fPhone,
+                B.fVouchno, 
+                I.fItemName, 
+                IP.fImage1, 
+                IT.fAmount, 
+                B.FVOUCHDT, 
+                IT.FproductID, 
+                IT.fTotQty,
+                B.FPAYMENTTYPE
+            FROM 
+                BLEDGER B  
+            JOIN 
+                ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+            JOIN 
+                ItemPurchaseOP IP ON IP.fID = IT.FproductID
+            JOIN 
+                PARTY P ON P.FCODE = B.fCucode 
+            JOIN 
+                ITEM I ON I.fItemcode = IT.fItemcode 
+            WHERE 
+                B.fvType = 'OD' 
+                AND B.FPAYMENTTYPE = 'Y'
 
-                ORDER BY 
-                    B.FVOUCHDT DESC
-                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+                AND (
+                    @PaymentType IS NULL OR
+                    (@PaymentType = 'COD' AND B.FPAYMENTTYPE = 'N') OR
+                    (@PaymentType = 'ONLINE' AND B.FPAYMENTTYPE = 'Y')
+                )
+
+                AND (
+                    @SearchTerm IS NULL OR
+                    P.FACNAME LIKE '%' + @SearchTerm + '%' OR
+                    I.fItemName LIKE '%' + @SearchTerm + '%' OR
+                    B.fVouchno LIKE '%' + @SearchTerm + '%'
+                )
+
+                AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
+                AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
+
+            ORDER BY 
+                B.FVOUCHDT DESC
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
                         cmd.Parameters.AddWithValue("@SearchTerm", (object)searchTerm ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@FromDate", (object)fromDate ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@ToDate", (object)toDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@PaymentType", (object)paymentType ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@Offset", (pageNumber - 1) * pageSize);
                         cmd.Parameters.AddWithValue("@PageSize", pageSize);
 
-                        using (var reader = await cmd.ExecuteReaderAsync())
+                        using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
                                 results.Add(new
                                 {
                                     PartyName = reader["FACNAME"].ToString(),
+                                    fPhone = reader["fPhone"].ToString(),
                                     VoucherNo = reader["fVouchno"].ToString(),
                                     ItemName = reader["fItemName"].ToString(),
                                     Image = reader["fImage1"]?.ToString(),
@@ -313,7 +338,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     VoucherDate = Convert.ToDateTime(reader["FVOUCHDT"]),
                                     ProductId = reader["FproductID"],
                                     TotalQty = reader["fTotQty"],
-                                    paymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
+                                    PaymentType = reader["FONLINE"]?.ToString() == "Y" ? "Online" : "COD"
                                 });
                             }
                         }
@@ -449,6 +474,132 @@ namespace CHITSCHEME.Controllers.Jewellery
             }
         }
 
+        [HttpGet("E-catelogPaymenReport")]
+        public async Task<IActionResult> GetPayments(
+       int pageNumber = 1,
+       int pageSize = 10,
+       string search = "",
+       DateTime? fromDate = null,
+       DateTime? toDate = null,
+       string paymentFilter = "") // COD / ONLINE / empty
+        {
+            var records = new List<dynamic>();
+
+            int totalCount = 0;
+            int codCount = 0;
+            int onlineCount = 0;
+            decimal codTotal = 0;
+            decimal onlineTotal = 0;
+
+            using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+            {
+                await con.OpenAsync();
+
+                // 🔹 COUNT QUERY
+                string countQuery = @"
+        SELECT COUNT(*)
+        FROM bledger b
+        JOIN party p ON p.fcode = b.fCucode
+        WHERE b.fvtype = 'od'
+          AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
+          AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
+          AND (@paymentFilter = '' 
+               OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
+               OR (@paymentFilter = 'COD' AND (b.fpaymenttype IS NULL OR b.fpaymenttype = '')))
+          AND (p.fAcname LIKE '%' + @search + '%'
+               OR p.fphone LIKE '%' + @search + '%')";
+
+                using (SqlCommand cmd = new SqlCommand(countQuery, con))
+                {
+                    cmd.Parameters.AddWithValue("@search", search ?? "");
+                    cmd.Parameters.AddWithValue("@fromDate", (object?)fromDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@toDate", (object?)toDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@paymentFilter", paymentFilter ?? "");
+
+                    totalCount = (int)await cmd.ExecuteScalarAsync();
+                }
+
+                // 🔹 DATA QUERY
+                string dataQuery = @"
+        SELECT 
+            p.fcode,
+            p.fAcname,
+            p.fphone,
+            b.fBillAmt,
+            b.fVouchdt,
+            CASE 
+                WHEN b.fpaymenttype = 'Y' THEN 'ONLINE'
+                ELSE 'COD'
+            END AS PaymentType
+        FROM bledger b
+        JOIN party p ON p.fcode = b.fCucode
+        WHERE b.fvtype = 'od'
+          AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
+          AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
+          AND (@paymentFilter = '' 
+               OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
+               OR (@paymentFilter = 'COD' AND (b.fpaymenttype IS NULL OR b.fpaymenttype = '')))
+          AND (p.fAcname LIKE '%' + @search + '%'
+               OR p.fphone LIKE '%' + @search + '%')
+        ORDER BY b.fVouchdt DESC
+        OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
+
+                using (SqlCommand cmd = new SqlCommand(dataQuery, con))
+                {
+                    cmd.Parameters.AddWithValue("@search", search ?? "");
+                    cmd.Parameters.AddWithValue("@fromDate", (object?)fromDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@toDate", (object?)toDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@paymentFilter", paymentFilter ?? "");
+                    cmd.Parameters.AddWithValue("@offset", (pageNumber - 1) * pageSize);
+                    cmd.Parameters.AddWithValue("@pageSize", pageSize);
+
+                    using (SqlDataReader dr = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await dr.ReadAsync())
+                        {
+                            decimal amt = Convert.ToDecimal(dr["fBillAmt"]);
+                            string type = dr["PaymentType"].ToString();
+
+                            if (type == "ONLINE")
+                            {
+                                onlineCount++;
+                                onlineTotal += amt;
+                            }
+                            else
+                            {
+                                codCount++;
+                                codTotal += amt;
+                            }
+
+                            records.Add(new
+                            {
+                                FCode = dr["fcode"].ToString(),
+                                Name = dr["fAcname"].ToString(),
+                                Phone = dr["fphone"].ToString(),
+                                BillAmount = amt,
+                                VoucherDate = Convert.ToDateTime(dr["fVouchdt"]),
+                                PaymentType = type
+                            });
+                        }
+                    }
+                }
+            }
+
+            return Ok(new
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalRecords = totalCount,
+
+                Summary = new
+                {
+                    COD = new { Count = codCount, TotalAmount = codTotal },
+                    ONLINE = new { Count = onlineCount, TotalAmount = onlineTotal }
+                },
+
+                Data = records
+            });
+        }
 
 
     }

@@ -69,7 +69,7 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 // 📄 Paged Data Query
                 string dataQuery = @"
-                    SELECT fcode, facname
+                    SELECT fcode, facname,FPHONE
                     FROM Party
                     WHERE fparent LIKE @fparent
                       AND fAclevel < 0
@@ -96,7 +96,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                             data.Add(new
                             {
                                 fcode = reader["fcode"].ToString(),
-                                facname = reader["facname"].ToString()
+                                facname = reader["facname"].ToString(),
+                                FPHONE = reader["FPHONE"].ToString()
                             });
                         }
                     }
