@@ -748,9 +748,9 @@ namespace CHITSCHEME.Controllers
             {
                 string insertBledger = @"
         INSERT INTO Bledger 
-        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE)
+        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS)
         VALUES 
-        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE)";
+        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS)";
 
                 var item = schemeList[0]; // Access the first item in the list
 
@@ -785,6 +785,7 @@ namespace CHITSCHEME.Controllers
                     cmd.Parameters.AddWithValue("@FNARRATION", "");
                     cmd.Parameters.AddWithValue("@FCHQCODE", "");
                     cmd.Parameters.AddWithValue("@FUPICODE", "00068");
+                    cmd.Parameters.AddWithValue("@FORDERSTATUS", "Y");
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -852,8 +853,370 @@ namespace CHITSCHEME.Controllers
         }
 
 
+        [HttpGet("DigiList")]
+        public IActionResult GetSchemes(
+       [FromQuery] string parentCode = "000010004400069", // default value
+       [FromQuery] int pageNumber = 1,
+       [FromQuery] int pageSize = 10,
+       [FromQuery] string searchTerm = "")
+        {
+            try
+            {
+                var schemes = new List<object>();
+
+                using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    conn.Open();
+
+                    string sqlQuery = @"
+WITH RankedSchemes AS (
+    SELECT 
+        P.FCODE,
+        P.FACNAME,
+        P.FPHONE,
+        P.FAMOUNT,
+        P.FCOMPCODE,
+        P.FDUE,
+        P.FDIGICR,
+        P.FDIGITYPE,
+        P.FID AS SCHEMECODE,
+        P.FSCHEMETYPE,
+        CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
+        IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
+        PARENT.FACNAME AS SCHEMENAME,
+        PARENT.FPARENT AS PARE,
+        ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 
+            FROM LEDGER L3
+            JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
+            WHERE 
+              L3.FID = P.FID 
+               AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
+              AND L3.fCrDb = 'CR' 
+              AND L3.FTYPE = 'CT'
+          ) THEN 'Y'
+          ELSE 'N'
+        END AS IS_CURRENT_MONTH_PAID
+    FROM PARTY P
+    LEFT JOIN (
+        SELECT 
+            L1.FID,
+            L1.FVRNO,
+            L1.FDUE,
+            L1.FVRAMOUNT
+        FROM LEDGER L1
+        INNER JOIN (
+            SELECT FID, MAX(FVRNO) AS MaxFVRNO
+            FROM LEDGER L2
+            JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
+            WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
+            GROUP BY L2.FID
+        ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
+        JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
+        WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
+    ) L ON P.FID = L.FID
+    LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+    WHERE P.FPARENT LIKE @ParentCode
+)
+SELECT *
+FROM RankedSchemes
+WHERE rn = 1
+AND (FACNAME LIKE @Search OR SCHEMENAME LIKE @Search)
+ORDER BY FACNAME
+OFFSET @Offset ROWS
+FETCH NEXT @PageSize ROWS ONLY;
+";
+
+                    using (SqlCommand cmd = new SqlCommand(sqlQuery, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@ParentCode", $"{parentCode}%");
+                        cmd.Parameters.AddWithValue("@Search", $"%{searchTerm}%");
+                        cmd.Parameters.AddWithValue("@Offset", (pageNumber - 1) * pageSize);
+                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var scheme = new
+                                {
+                                    FCODE = reader["FCODE"],
+                                    FACNAME = reader["FACNAME"],
+                                    FPHONE = reader["FPHONE"],
+                                    FAMOUNT = reader["FAMOUNT"],
+                                    FCOMPCODE = reader["FCOMPCODE"],
+                                    FDUE = reader["FDUE"],
+                                    FDIGICR = reader["FDIGICR"],
+                                    FDIGITYPE = reader["FDIGITYPE"],
+                                    SCHEMECODE = reader["SCHEMECODE"],
+                                    FSCHEMETYPE = reader["FSCHEMETYPE"],
+                                    PaidDue = reader["PaidDue"],
+                                    FDUE_Comparison = reader["FDUE_Comparison"],
+                                    SCHEMENAME = reader["SCHEMENAME"],
+                                    PARE = reader["PARE"],
+                                    IS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]
+                                };
+                                schemes.Add(scheme);
+                            }
+                        }
+                    }
+                }
+
+                return Ok(new
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Data = schemes
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+
+        [HttpGet("PlanList")]
+        public IActionResult GetPlanList(
+          [FromQuery] int pageNumber = 1,
+          [FromQuery] int pageSize = 10,
+          [FromQuery] string searchTerm = "")
+        {
+            try
+            {
+                var plans = new List<object>();
+
+                using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    conn.Open();
+
+                    string sqlQuery = @"
+WITH RankedSchemes AS (
+    SELECT 
+        P.FCODE,
+        P.FACNAME,
+        P.FPHONE,
+        P.FAMOUNT,
+        P.FCOMPCODE,
+        P.FDUE,
+        P.FDIGICR,
+        P.FDIGITYPE,
+        P.FID AS SCHEMECODE,
+        P.FSCHEMETYPE,
+        CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
+        IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
+        PARENT.FACNAME AS SCHEMENAME,
+        PARENT.FPARENT AS PARE,
+        ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 
+            FROM LEDGER L3
+            JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
+            WHERE 
+              L3.FID = P.FID 
+               AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
+              AND L3.fCrDb = 'CR' 
+              AND L3.FTYPE = 'CT'
+          ) THEN 'Y'
+          ELSE 'N'
+        END AS IS_CURRENT_MONTH_PAID
+    FROM PARTY P
+    LEFT JOIN (
+        SELECT 
+            L1.FID,
+            L1.FVRNO,
+            L1.FDUE,
+            L1.FVRAMOUNT
+        FROM LEDGER L1
+        INNER JOIN (
+            SELECT FID, MAX(FVRNO) AS MaxFVRNO
+            FROM LEDGER L2
+            JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
+            WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
+            GROUP BY L2.FID
+        ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
+        JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
+        WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
+    ) L ON P.FID = L.FID
+    LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+   WHERE P.FPARENT NOT  LIKE '000010004400068%' AND P.FPARENT NOT  LIKE  '000010004400069%' 
+)
+SELECT *
+FROM RankedSchemes
+WHERE rn = 1
+AND (FACNAME LIKE @Search OR SCHEMENAME LIKE @Search)
+ORDER BY FACNAME
+OFFSET @Offset ROWS
+FETCH NEXT @PageSize ROWS ONLY;
+";
+
+                    using (SqlCommand cmd = new SqlCommand(sqlQuery, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Search", $"%{searchTerm}%");
+                        cmd.Parameters.AddWithValue("@Offset", (pageNumber - 1) * pageSize);
+                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var plan = new
+                                {
+                                    FCODE = reader["FCODE"],
+                                    FACNAME = reader["FACNAME"],
+                                    FPHONE = reader["FPHONE"],
+                                    FAMOUNT = reader["FAMOUNT"],
+                                    FCOMPCODE = reader["FCOMPCODE"],
+                                    FDUE = reader["FDUE"],
+                                    FDIGICR = reader["FDIGICR"],
+                                    FDIGITYPE = reader["FDIGITYPE"],
+                                    SCHEMECODE = reader["SCHEMECODE"],
+                                    FSCHEMETYPE = reader["FSCHEMETYPE"],
+                                    PaidDue = reader["PaidDue"],
+                                    FDUE_Comparison = reader["FDUE_Comparison"],
+                                    SCHEMENAME = reader["SCHEMENAME"],
+                                    PARE = reader["PARE"],
+                                    IS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]
+                                };
+                                plans.Add(plan);
+                            }
+                        }
+                    }
+                }
+
+                return Ok(new
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Data = plans
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+
+
+        [HttpGet("PaymentReport")]
+        public IActionResult GetPaymentReport(
+    [FromQuery] DateTime fromDate,
+    [FromQuery] DateTime toDate,
+    [FromQuery] string searchTerm = "",
+    [FromQuery] int pageNumber = 1,
+    [FromQuery] int pageSize = 10)
+        {
+            try
+            {
+                var onlineList = new List<object>();
+                var offlineList = new List<object>();
+
+                decimal onlineTotal = 0;
+                decimal offlineTotal = 0;
+
+                using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
+                {
+                    conn.Open();
+
+                    string query = @"
+SELECT 
+    FORMAT(CAST(L.FDATE AS DATE), 'dd/MM/yyyy') AS FDATE,
+    L.FVRAMOUNT,
+    L.FWT,
+    P.FACNAME,
+    P.FPHONE,
+    P.FID,
+    ISNULL(NULLIF(B.FPAYMENTTYPE,''),'N') AS PAYMENTTYPE
+FROM LEDGER L
+JOIN PARTY P ON P.FID = L.FID
+LEFT JOIN BLEDGER B ON B.FVOUCHNO = L.FVRNO
+WHERE 
+    L.FCRDB = 'CR'
+    AND L.FTYPE = 'CT'
+    AND CAST(L.FDATE AS DATE) BETWEEN @FromDate AND @ToDate
+    AND (P.FACNAME LIKE @Search OR P.FPHONE LIKE @Search)
+ORDER BY L.FDATE;
+";
+
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
+                        cmd.Parameters.AddWithValue("@ToDate", toDate.Date);
+                        cmd.Parameters.AddWithValue("@Search", $"%{searchTerm}%");
+
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                decimal amount = Convert.ToDecimal(reader["FVRAMOUNT"]);
+                                string paymentType = reader["PAYMENTTYPE"].ToString();
+
+                                var record = new
+                                {
+                                    FDate = reader["FDATE"],
+                                    Amount = amount,
+                                    Weight = reader["FWT"],
+                                    Customer = reader["FACNAME"],
+                                    FID = reader["FID"],
+                                    Phone = reader["FPHONE"]
+                                };
+
+                                if (paymentType == "Y")
+                                {
+                                    onlineTotal += amount;
+                                    onlineList.Add(record);
+                                }
+                                else
+                                {
+                                    offlineTotal += amount;
+                                    offlineList.Add(record);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ✅ PAGINATION
+                var pagedOnline = onlineList
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                var pagedOffline = offlineList
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                return Ok(new
+                {
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+
+                    OnlineTotal = onlineTotal,
+                    OfflineTotal = offlineTotal,
+
+                    OnlineCount = onlineList.Count,
+                    OfflineCount = offlineList.Count,
+
+                    OnlineData = pagedOnline,
+                    OfflineData = pagedOffline
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
     }
+
+
 }
+
 
 
 

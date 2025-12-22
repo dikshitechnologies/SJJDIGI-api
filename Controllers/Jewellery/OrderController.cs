@@ -33,20 +33,34 @@ namespace CHITSCHEME.Controllers.Jewellery
                     {
                         try
                         {
-                            // 1. Get current max FVOUCHER number
-                            string maxVoucherQuery = @"
-                            
-                            SELECT ISNULL(MAX(CAST(SUBSTRING(fVouchno, 3, LEN(fVouchno)) AS INT)), 0) 
-                            FROM BLEDGER WHERE fvType ='OD'";
+                            string getMaxVoucherQuery = @"
+                            SELECT MAX(fVouchno)
+                            FROM BLEDGER
+                            WHERE fvType = 'OD'";
 
-                            int maxVoucher = 0;
-                            using (SqlCommand cmdMax = new SqlCommand(maxVoucherQuery, con, tran))
+                            string lastVoucher = null;
+
+                            using (SqlCommand cmd = new SqlCommand(getMaxVoucherQuery, con, tran))
                             {
-                                maxVoucher = Convert.ToInt32(await cmdMax.ExecuteScalarAsync());
+                                lastVoucher = Convert.ToString(await cmd.ExecuteScalarAsync());
                             }
 
-                            int nextVoucher = maxVoucher + 1;
-                            string formattedVoucher = "OD" + nextVoucher.ToString("D5"); // Example: OD00001
+                            string formattedVoucher;
+
+                            if (string.IsNullOrEmpty(lastVoucher))
+                            {
+                                // First voucher
+                                formattedVoucher = "OD00001";
+                            }
+                            else
+                            {
+                                // Extract numeric part only
+                                string numberPart = new string(lastVoucher.Where(char.IsDigit).ToArray());
+
+                                int nextNumber = int.Parse(numberPart) + 1;
+
+                                formattedVoucher = "OD" + nextNumber.ToString("D5");
+                            }
 
                             double totalAmount = 0;
                             int totalQuantity = 0;
@@ -132,8 +146,8 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                             // 4. Insert summary into BLEDGER
                             string insertBledgerQuery = @"
-                            INSERT INTO BLEDGER (fCucode, fvtype, FVOUCHNO, FBILLAMT, FBILLTYPE, FVOUCHDT,FORDERSTATUS,FONLINE)
-                            VALUES (@CustomerCode, 'OD', @FVOUCHER, @FBILLAMOUNT, 'OD', GETDATE(),@FORDERSTATUS,@FONLINE)";
+                            INSERT INTO BLEDGER (fCucode, fvtype, FVOUCHNO, FBILLAMT, FBILLTYPE, FVOUCHDT,FORDERSTATUS,FPAYMENTTYPE)
+                            VALUES (@CustomerCode, 'OD', @FVOUCHER, @FBILLAMOUNT, 'OD', GETDATE(),@FORDERSTATUS,@FPAYMENTTYPE)";
 
                             using (SqlCommand cmdBledger = new SqlCommand(insertBledgerQuery, con, tran))
                             {
@@ -143,15 +157,15 @@ namespace CHITSCHEME.Controllers.Jewellery
                                 cmdBledger.Parameters.AddWithValue("@FORDERSTATUS", 'N');
                                 if (order.PaymentMethod.ToUpper() == "COD")
                                 {
-                                    cmdBledger.Parameters.AddWithValue("@FONLINE", "N");  //N Cash on Delivery
+                                    cmdBledger.Parameters.AddWithValue("@FPAYMENTTYPE", "N");  //N Cash on Delivery
                                 }
                                 else if (order.PaymentMethod.ToUpper() == "ONLINE")
                                 {
-                                    cmdBledger.Parameters.AddWithValue("@FONLINE", "Y");  //Y Have online payment
+                                    cmdBledger.Parameters.AddWithValue("@FPAYMENTTYPE", "Y");  //Y Have online payment
                                 }
                                 else
                                 {
-                                    cmdBledger.Parameters.AddWithValue("@FONLINE", "I");  // Default to N
+                                    cmdBledger.Parameters.AddWithValue("@FPAYMENTTYPE", "I");  // Default to N
                                 }
 
                                 await cmdBledger.ExecuteNonQueryAsync();
