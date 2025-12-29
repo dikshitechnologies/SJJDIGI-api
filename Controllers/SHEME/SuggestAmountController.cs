@@ -23,13 +23,12 @@ namespace CHITSCHEME.Controllers.SHEME
             {
                 // ❌ DELETE OLD DATA FOR TODAY
                 string deleteSql = @"
-            DELETE FROM AmountSuggestion
-            WHERE CreatedDate = @Date
-              AND MetalType IN ('GOLD22K','GOLD24K','SILVER')";
+            DELETE FROM AmountSuggestion WHERE
+               MetalType IN ('GOLD22K','GOLD24K','SILVER')";
 
                 using (SqlCommand delCmd = new SqlCommand(deleteSql, conn, tran))
                 {
-                    delCmd.Parameters.AddWithValue("@Date", today);
+                    //delCmd.Parameters.AddWithValue("@Date", today);
                     await delCmd.ExecuteNonQueryAsync();
                 }
 
@@ -87,11 +86,10 @@ namespace CHITSCHEME.Controllers.SHEME
             string sql = @"
         SELECT MetalType, SuggestAmount
         FROM AmountSuggestion
-        WHERE CreatedDate = @Date
         ORDER BY SuggestAmount";
 
             using SqlCommand cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@Date", today);
+            //cmd.Parameters.AddWithValue("@Date", today);
 
             var gold22k = new List<decimal>();
             var gold24k = new List<decimal>();

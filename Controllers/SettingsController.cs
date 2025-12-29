@@ -11,42 +11,35 @@ namespace CHITSCHEME.Controllers
     {
         [HttpPost("SavePlatformCharge")]
         public async Task<IActionResult> SavePlatformCharge(
-            [FromBody] PlatformChargePostDto dto)
+         [FromBody] PlatformChargePostDto dto)
         {
             using SqlConnection conn = new SqlConnection(DBHelper.GetConnection());
             await conn.OpenAsync();
 
             DateTime today = DateTime.Today;
 
-            async Task UpsertCharge(string type, ChargeDto data)
+            async Task DeleteAndInsert(string type, ChargeDto data)
             {
                 if (data == null) return;
 
-                // 🔍 Check if record exists for today
-                string checkSql = @"
-            SELECT TOP 1 fid
-            FROM PlatformCharge
-            WHERE fType = @Type AND fDate = @Date";
+                // ❌ DELETE existing
+                string deleteSql = @"
+            DELETE FROM PlatformCharge
+            WHERE fType = @Type";
 
-                int? fid = null;
-                using (SqlCommand checkCmd = new SqlCommand(checkSql, conn))
+                using (SqlCommand deleteCmd = new SqlCommand(deleteSql, conn))
                 {
-                    checkCmd.Parameters.AddWithValue("@Type", type);
-                    checkCmd.Parameters.AddWithValue("@Date", today);
-
-                    var result = await checkCmd.ExecuteScalarAsync();
-                    if (result != null)
-                        fid = Convert.ToInt32(result);
+                    deleteCmd.Parameters.AddWithValue("@Type", type);
+                    await deleteCmd.ExecuteNonQueryAsync();
                 }
 
-                if (fid == null)
-                {
-                    // ➕ INSERT
-                    string insertSql = @"
-                INSERT INTO PlatformCharge (fType, fPlatformFee, fGst, fDate)
-                VALUES (@Type, @Fee, @Gst, @Date)";
+                // ➕ INSERT fresh
+                string insertSql = @"
+            INSERT INTO PlatformCharge (fType, fPlatformFee, fGst, fDate)
+            VALUES (@Type, @Fee, @Gst, @Date)";
 
-                    using SqlCommand insertCmd = new SqlCommand(insertSql, conn);
+                using (SqlCommand insertCmd = new SqlCommand(insertSql, conn))
+                {
                     insertCmd.Parameters.AddWithValue("@Type", type);
                     insertCmd.Parameters.AddWithValue("@Fee", data.PlatformFee);
                     insertCmd.Parameters.AddWithValue("@Gst", data.GstPercent);
@@ -54,34 +47,17 @@ namespace CHITSCHEME.Controllers
 
                     await insertCmd.ExecuteNonQueryAsync();
                 }
-                else
-                {
-                    // ✏️ UPDATE
-                    string updateSql = @"
-                UPDATE PlatformCharge
-                SET fPlatformFee = @Fee,
-                    fGst = @Gst
-                WHERE fid = @fid";
-
-                    using SqlCommand updateCmd = new SqlCommand(updateSql, conn);
-                    updateCmd.Parameters.AddWithValue("@Fee", data.PlatformFee);
-                    updateCmd.Parameters.AddWithValue("@Gst", data.GstPercent);
-                    updateCmd.Parameters.AddWithValue("@fid", fid);
-
-                    await updateCmd.ExecuteNonQueryAsync();
-                }
             }
 
-            await UpsertCharge("P", dto.Scheme);
-            await UpsertCharge("E", dto.Ecatalog);
+            await DeleteAndInsert("P", dto.Scheme);
+            await DeleteAndInsert("E", dto.Ecatalog);
 
             return Ok(new
             {
                 Success = true,
-                Message = "Platform charges saved successfully"
+                Message = "Platform charges replaced successfully"
             });
         }
-
 
         [HttpGet("GetPlatformCharge")]
         public async Task<IActionResult> GetPlatformCharge()
@@ -93,11 +69,9 @@ namespace CHITSCHEME.Controllers
 
             string sql = @"
         SELECT fType, fPlatformFee, fGst
-        FROM PlatformCharge
-        WHERE fDate = @Date";
+        FROM PlatformCharge";
 
             using SqlCommand cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@Date", today);
 
             ChargeDto scheme = null;
             ChargeDto ecatalog = null;
