@@ -17,14 +17,143 @@ namespace CHITSCHEME.Controllers.Jewellery
 
 
         //------------------------------------------------All Category List Items   Mixed --------------------
+        //      [HttpGet]
+        //      [Route("ItemsList/{itemCode}/{Type}")]
+        //      public async Task<IActionResult> ItemsList(
+        //    [FromRoute] string itemCode,
+        //    [FromQuery] int pageNumber = 1,
+        //    [FromQuery] int pageSize = 20,
+        //    [FromQuery] string customerCode = "",
+        //    [FromRoute] string Type = "All"
+        //)
+        //      {
+        //          var ItemsList = new List<object>();
+
+        //          try
+        //          {
+        //              using (SqlConnection connection = new SqlConnection(DBHelper.GetConnection()))
+        //              {
+        //                  await connection.OpenAsync();
+
+        //                  string query = @"
+        //              SELECT 
+        //                  op.Itemcode AS fItemcode,
+        //                  op.fParent,
+        //                  i.fItemName,
+        //                  op.fPiecerate,
+        //                  op.fTax,
+        //                  op.Gms AS NetWt,
+        //                  op.Gross AS GrossWt,
+        //                  op.Wastage,
+        //                  op.Mc,
+        //                  op.StnChrg AS StoneCharges,
+        //                  op.fOthers,
+        //                  op.McAmount,
+        //                  op.fid,
+        //                  COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
+        //                  op.FImage1,
+        //                  op.FImage2,
+        //                  op.FImage3,
+        //                  op.FImage4,
+        //                  d.fRate AS GoldRate,
+        //                  op.fDate,
+        //                  CASE WHEN w.fProductCode IS NOT NULL THEN 'Y' ELSE 'N' END AS IsWishlist
+        //              FROM ITEMPURCHASEOP op
+        //              JOIN item i ON i.fItemcode = op.Itemcode
+        //              LEFT JOIN Division d ON d.FCODE = op.fDiv
+        //              LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode AND w.fid = op.fid 
+        //              WHERE op.Itemcode = @itemCode
+        //              ORDER BY op.fDate DESC
+        //              OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+
+        //                  using (SqlCommand command = new SqlCommand(query, connection))
+        //                  {
+        //                      int offset = (pageNumber - 1) * pageSize;
+
+        //                      // Add parameters properly
+        //                      command.Parameters.AddWithValue("@itemCode", itemCode ?? string.Empty);
+        //                      command.Parameters.AddWithValue("@customerCode", customerCode ?? string.Empty);
+        //                      command.Parameters.AddWithValue("@Offset", offset);
+        //                      command.Parameters.AddWithValue("@PageSize", pageSize);
+
+        //                      using (SqlDataReader reader = await command.ExecuteReaderAsync())
+        //                      {
+        //                          while (await reader.ReadAsync())
+        //                          {
+        //                              string piecerateFlag = reader["fPiecerate"]?.ToString();
+        //                              decimal netWt = SafeGetDecimal(reader, "NetWt");
+        //                              decimal grossWt = SafeGetDecimal(reader, "GrossWt");
+        //                              decimal wastage = SafeGetDecimal(reader, "Wastage");
+        //                              decimal mc = SafeGetDecimal(reader, "McAmount");
+        //                              decimal stoneCharges = SafeGetDecimal(reader, "StoneCharges");
+        //                              decimal fOthers = SafeGetDecimal(reader, "fOthers");
+        //                              decimal mcAmount = SafeGetDecimal(reader, "McAmount");
+        //                              decimal tax = SafeGetDecimal(reader, "fTax");
+        //                              decimal goldRate = SafeGetDecimal(reader, "GoldRate");
+
+        //                              decimal totalAmount = 0;
+
+        //                              // Price calculation
+        //                              if (piecerateFlag?.ToUpper() == "Y")
+        //                              {
+        //                                  totalAmount = mcAmount + tax;
+        //                              }
+        //                              else
+        //                              {
+        //                                  totalAmount = PriceCalculator.CalculatePrice(
+        //                                  null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
+        //                              ).TotalAmount;
+        //                              }
+
+        //                              ItemsList.Add(new
+        //                              {
+        //                                  fItemcode = reader["fItemcode"]?.ToString(),
+        //                                  fItemName = reader["fItemName"]?.ToString(),
+        //                                  fParent = reader["fParent"]?.ToString(),
+        //                                  NetWt = netWt,
+        //                                  GrossWt = grossWt,
+        //                                  Wastage = wastage,
+        //                                  fMc = mc,
+        //                                  StoneCharges = stoneCharges,
+        //                                  fOthers = fOthers,
+        //                                  McAmount = mcAmount,
+        //                                  fTax = tax,
+        //                                  GoldRate = goldRate,
+        //                                  TotalAmount = totalAmount,
+        //                                  fimage = reader["fimage"]?.ToString() ?? string.Empty,
+        //                                  fimage1 = reader["FImage1"]?.ToString(),
+        //                                  fimage2 = reader["FImage2"]?.ToString(),
+        //                                  fimage3 = reader["FImage3"]?.ToString(),
+        //                                  fimage4 = reader["FImage4"]?.ToString(),
+        //                                  IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
+        //                                  fID = reader["fid"]?.ToString()
+        //                              });
+        //                          }
+        //                      }
+        //                  }
+        //              }
+
+        //              return Ok(new { items = ItemsList });
+        //          }
+        //          catch (SqlException sqlEx)
+        //          {
+        //              return StatusCode(500, new { error = "Database error occurred.", details = sqlEx.Message });
+        //          }
+        //          catch (Exception ex)
+        //          {
+        //              return StatusCode(500, new { error = "Unexpected error occurred.", details = ex.Message });
+        //          }
+        //      }
+
         [HttpGet]
-        [Route("ItemsList/{itemCode}")]
+        [Route("ItemsList/{itemCode}/{Type}")]
         public async Task<IActionResult> ItemsList(
-      [FromRoute] string itemCode,
-      [FromQuery] int pageNumber = 1,
-      [FromQuery] int pageSize = 20,
-      [FromQuery] string customerCode = ""
-  )
+    [FromRoute] string itemCode,
+    [FromRoute] string Type = "All",
+    [FromQuery] int pageNumber = 1,
+    [FromQuery] int pageSize = 20,
+    [FromQuery] string customerCode = ""
+)
         {
             var ItemsList = new List<object>();
 
@@ -34,7 +163,10 @@ namespace CHITSCHEME.Controllers.Jewellery
                 {
                     await connection.OpenAsync();
 
-                    string query = @"
+
+                    string whereCondition = Type.Equals("All", StringComparison.OrdinalIgnoreCase)? "op.fParent = @itemCode": "op.Itemcode = @itemCode";
+
+                    string query = $@"
                 SELECT 
                     op.Itemcode AS fItemcode,
                     op.fParent,
@@ -56,21 +188,27 @@ namespace CHITSCHEME.Controllers.Jewellery
                     op.FImage4,
                     d.fRate AS GoldRate,
                     op.fDate,
-                    CASE WHEN w.fProductCode IS NOT NULL THEN 'Y' ELSE 'N' END AS IsWishlist
+                    CASE 
+                        WHEN w.fProductCode IS NOT NULL THEN 'Y' 
+                        ELSE 'N' 
+                    END AS IsWishlist
                 FROM ITEMPURCHASEOP op
                 JOIN item i ON i.fItemcode = op.Itemcode
                 LEFT JOIN Division d ON d.FCODE = op.fDiv
-                LEFT JOIN Wishlist w ON i.fItemcode = w.fProductCode AND w.fCusCode = @customerCode AND w.fid = op.fid 
-                WHERE op.Itemcode = @itemCode
+                LEFT JOIN Wishlist w 
+                    ON i.fItemcode = w.fProductCode 
+                    AND w.fCusCode = @customerCode 
+                    AND w.fid = op.fid
+                WHERE {whereCondition}
                 ORDER BY op.fDate DESC
-                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;";
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+            ";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         int offset = (pageNumber - 1) * pageSize;
 
-                        // Add parameters properly
-                        command.Parameters.AddWithValue("@itemCode", itemCode ?? string.Empty);
+                        command.Parameters.AddWithValue("@itemCode", itemCode);
                         command.Parameters.AddWithValue("@customerCode", customerCode ?? string.Empty);
                         command.Parameters.AddWithValue("@Offset", offset);
                         command.Parameters.AddWithValue("@PageSize", pageSize);
@@ -80,28 +218,35 @@ namespace CHITSCHEME.Controllers.Jewellery
                             while (await reader.ReadAsync())
                             {
                                 string piecerateFlag = reader["fPiecerate"]?.ToString();
+
                                 decimal netWt = SafeGetDecimal(reader, "NetWt");
-                                decimal grossWt = SafeGetDecimal(reader, "GrossWt");
                                 decimal wastage = SafeGetDecimal(reader, "Wastage");
                                 decimal mc = SafeGetDecimal(reader, "McAmount");
                                 decimal stoneCharges = SafeGetDecimal(reader, "StoneCharges");
                                 decimal fOthers = SafeGetDecimal(reader, "fOthers");
-                                decimal mcAmount = SafeGetDecimal(reader, "McAmount");
                                 decimal tax = SafeGetDecimal(reader, "fTax");
                                 decimal goldRate = SafeGetDecimal(reader, "GoldRate");
 
-                                decimal totalAmount = 0;
+                                decimal totalAmount;
 
-                                // Price calculation
                                 if (piecerateFlag?.ToUpper() == "Y")
                                 {
-                                    totalAmount = mcAmount + tax;
+                                    totalAmount = mc + tax;
                                 }
                                 else
                                 {
                                     totalAmount = PriceCalculator.CalculatePrice(
-                                    null, netWt, wastage, 0, goldRate, mc, fOthers, stoneCharges, tax, goldRate
-                                ).TotalAmount;
+                                        null,
+                                        netWt,
+                                        wastage,
+                                        0,
+                                        goldRate,
+                                        mc,
+                                        fOthers,
+                                        stoneCharges,
+                                        tax,
+                                        goldRate
+                                    ).TotalAmount;
                                 }
 
                                 ItemsList.Add(new
@@ -110,12 +255,12 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     fItemName = reader["fItemName"]?.ToString(),
                                     fParent = reader["fParent"]?.ToString(),
                                     NetWt = netWt,
-                                    GrossWt = grossWt,
+                                    GrossWt = SafeGetDecimal(reader, "GrossWt"),
                                     Wastage = wastage,
                                     fMc = mc,
                                     StoneCharges = stoneCharges,
-                                    fOthers = fOthers,
-                                    McAmount = mcAmount,
+                                    fOthers,
+                                    McAmount = mc,
                                     fTax = tax,
                                     GoldRate = goldRate,
                                     TotalAmount = totalAmount,
@@ -134,15 +279,13 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 return Ok(new { items = ItemsList });
             }
-            catch (SqlException sqlEx)
-            {
-                return StatusCode(500, new { error = "Database error occurred.", details = sqlEx.Message });
-            }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Unexpected error occurred.", details = ex.Message });
+                return StatusCode(500, new { error = ex.Message });
             }
         }
+
+
 
         private decimal SafeGetDecimal(SqlDataReader reader, string columnName)
         {
@@ -200,7 +343,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 }
                 subItemList.Insert(0, new SubcategoryItems
                 {
-                    ItemCode = "", 
+                    ItemCode = "",
                     Fparent = parentCode,
                     ItemName = "All",
                     Fimage = "" 
