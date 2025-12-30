@@ -9,88 +9,107 @@ namespace CHITSCHEME.Controllers
     [ApiController]
     public class SettingsController : ControllerBase
     {
-
-        [HttpGet("getFeeSettings")]
-        public async Task<IActionResult> GetFeeSettings()
+        [HttpPost("SavePlatformCharge")]
+        public async Task<IActionResult> SavePlatformCharge(
+         [FromBody] PlatformChargePostDto dto)
         {
-            FeeSettingsModel model = null;
+            using SqlConnection conn = new SqlConnection(DBHelper.GetConnection());
+            await conn.OpenAsync();
 
-            using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+            DateTime today = DateTime.Today;
+
+            async Task DeleteAndInsert(string type, ChargeDto data)
             {
-                string query = @"SELECT TOP 1 FGstPercent, FPlatformFee FROM ILedger";
+                if (data == null) return;
 
-                using (SqlCommand cmd = new SqlCommand(query, con))
+                // ❌ DELETE existing
+                string deleteSql = @"
+            DELETE FROM PlatformCharge
+            WHERE fType = @Type";
+
+                using (SqlCommand deleteCmd = new SqlCommand(deleteSql, conn))
                 {
-                    await con.OpenAsync();
+                    deleteCmd.Parameters.AddWithValue("@Type", type);
+                    await deleteCmd.ExecuteNonQueryAsync();
+                }
 
-                    using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            model = new FeeSettingsModel
-                            {
-                                GstPercent = reader["FGstPercent"] == DBNull.Value
-                                             ? 18
-                                             : Convert.ToDecimal(reader["FGstPercent"]),
+                // ➕ INSERT fresh
+                string insertSql = @"
+            INSERT INTO PlatformCharge (fType, fPlatformFee, fGst, fDate)
+            VALUES (@Type, @Fee, @Gst, @Date)";
 
-                                PlatformFee = reader["FPlatformFee"] == DBNull.Value
-                                              ? 50
-                                              : Convert.ToDecimal(reader["FPlatformFee"])
-                            };
-                        }
-                        else
-                        {
-                            model = new FeeSettingsModel
-                            {
-                                GstPercent = 18,
-                                PlatformFee = 50
-                            };
-                        }
-                    }
+                using (SqlCommand insertCmd = new SqlCommand(insertSql, conn))
+                {
+                    insertCmd.Parameters.AddWithValue("@Type", type);
+                    insertCmd.Parameters.AddWithValue("@Fee", data.PlatformFee);
+                    insertCmd.Parameters.AddWithValue("@Gst", data.GstPercent);
+                    insertCmd.Parameters.AddWithValue("@Date", today);
+
+                    await insertCmd.ExecuteNonQueryAsync();
                 }
             }
 
-            return Ok(model);
+            await DeleteAndInsert("P", dto.Scheme);
+            await DeleteAndInsert("E", dto.Ecatalog);
+
+            return Ok(new
+            {
+                Success = true,
+                Message = "Platform charges replaced successfully"
+            });
         }
 
-
-
-        [HttpPut("updateFeeSettings")]
-        public async Task<IActionResult> UpdateFeeSettings( string gst , string platformFee)
+        [HttpGet("GetPlatformCharge")]
+        public async Task<IActionResult> GetPlatformCharge()
         {
-            
+            using SqlConnection conn = new SqlConnection(DBHelper.GetConnection());
+            await conn.OpenAsync();
 
-            using (SqlConnection con = new SqlConnection(DBHelper.GetConnection()))
+            DateTime today = DateTime.Today;
+
+            string sql = @"
+        SELECT fType, fPlatformFee, fGst
+        FROM PlatformCharge";
+
+            using SqlCommand cmd = new SqlCommand(sql, conn);
+
+            ChargeDto scheme = null;
+            ChargeDto ecatalog = null;
+
+            using SqlDataReader reader = await cmd.ExecuteReaderAsync();
+            while (reader.Read())
             {
-                await con.OpenAsync();
+                string type = reader["fType"].ToString();
+                decimal fee = Convert.ToDecimal(reader["fPlatformFee"]);
+                decimal gst = Convert.ToDecimal(reader["fGst"]);
 
-                string query = @"UPDATE ILedger SET FGstPercent = @gst, FPlatformFee = @platformFee";
-
-                using (SqlCommand cmd = new SqlCommand(query, con))
-                {
-                    cmd.Parameters.AddWithValue("@gst", gst);
-                    cmd.Parameters.AddWithValue("@platformFee", platformFee);
-
-                    await cmd.ExecuteNonQueryAsync();  // Correct for UPDATE
-                }
+                if (type == "P")
+                    scheme = new ChargeDto { PlatformFee = fee, GstPercent = gst };
+                else if (type == "E")
+                    ecatalog = new ChargeDto { PlatformFee = fee, GstPercent = gst };
             }
 
             return Ok(new
             {
-                success = true,
-                message = "Updated Successfully",
-                gstPercent = gst,
-                platformFee = platformFee
+                scheme,
+                ecatalog
             });
         }
+
 
 
     }
 }
 
 
-public class FeeSettingsModel
+public class PlatformChargePostDto
 {
-    public decimal GstPercent { get; set; }
+    public ChargeDto Scheme { get; set; }
+    public ChargeDto Ecatalog { get; set; }
+}
+
+public class ChargeDto
+{
     public decimal PlatformFee { get; set; }
+    public decimal GstPercent { get; set; }
 }

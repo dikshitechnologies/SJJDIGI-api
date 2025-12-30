@@ -185,7 +185,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 ITEM I ON I.fItemcode = IT.fItemcode 
             WHERE 
                 B.fvType = 'OD' 
-                AND B.FPAYMENTTYPE = 'N'
+                AND B.FORDERSTATUS = 'N'
 
                 AND (
                     @PaymentType IS NULL OR
