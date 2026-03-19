@@ -17,21 +17,36 @@ namespace CHITSCHEME.Controllers
             using SqlConnection conn = new SqlConnection(DBHelper.GetConnection());
             await conn.OpenAsync();
 
+            //string sql = @"
+            //SELECT 
+            //    P.fAcname,
+            //    PR.RazorpayOrderId,
+            //    PR.RazorpayPaymentId,
+            //    PR.RazorpaySignature,
+            //    PR.Amount,
+            //    PR.Status,
+            //    PR.CONTACT,
+            //    PR.PaymentTime,
+            //    PR.VerificationTime,
+            //    PR.FpaymentType
+            //FROM PaymentRecords PR
+            //JOIN party P ON PR.UserId = P.fCode
+            //WHERE 1 = 1 ";
             string sql = @"
-            SELECT 
-                P.fAcname,
-                PR.RazorpayOrderId,
-                PR.RazorpayPaymentId,
-                PR.RazorpaySignature,
-                PR.Amount,
-                PR.Status,
-                PR.CONTACT,
-                PR.PaymentTime,
-                PR.VerificationTime,
-                PR.FpaymentType
-            FROM PaymentRecords PR
-            JOIN party P ON PR.UserId = P.fCode
-            WHERE 1 = 1 ";
+             SELECT 
+                 P.UserName,
+                 PR.RazorpayOrderId,
+                 PR.RazorpayPaymentId,
+                 PR.RazorpaySignature,
+                 PR.Amount,
+                 PR.Status,
+                 PR.CONTACT,
+                 PR.PaymentTime,
+                 PR.VerificationTime,
+                 PR.FpaymentType
+             FROM PaymentRecords PR
+             JOIN RegisterUsers P ON PR.UserId = P.UserID
+             WHERE 1 = 1  ";
 
             // --- FPAYMENTTYPE ---
             if (!string.IsNullOrEmpty(filter.FpaymentType))
@@ -39,7 +54,7 @@ namespace CHITSCHEME.Controllers
 
             // --- OTHER FILTERS ---
             if (!string.IsNullOrEmpty(filter.Name))
-                sql += " AND P.fAcname LIKE @Name ";
+                sql += " AND P.UserName LIKE @Name ";
             if (!string.IsNullOrEmpty(filter.Status))
                 sql += " AND PR.Status = @Status ";
             if (!string.IsNullOrEmpty(filter.OrderId))
@@ -86,21 +101,36 @@ namespace CHITSCHEME.Controllers
             using SqlConnection conn = new SqlConnection(DBHelper.GetConnection());
             await conn.OpenAsync();
 
+            //string sql = @"
+            //SELECT 
+            //    P.fAcname,
+            //    PR.RazorpayOrderId,
+            //    PR.RazorpayPaymentId,
+            //    PR.RazorpaySignature,
+            //    PR.Amount,
+            //    PR.Status,
+            //    PR.CONTACT,
+            //    PR.PaymentTime,
+            //    PR.VerificationTime,
+            //    PR.FpaymentType
+            //FROM PaymentRecords PR
+            //JOIN party P ON PR.UserId = P.fCode
+            //WHERE 1 = 1 ";
             string sql = @"
             SELECT 
-                P.fAcname,
-                PR.RazorpayOrderId,
-                PR.RazorpayPaymentId,
-                PR.RazorpaySignature,
-                PR.Amount,
-                PR.Status,
-                PR.CONTACT,
-                PR.PaymentTime,
-                PR.VerificationTime,
-                PR.FpaymentType
-            FROM PaymentRecords PR
-            JOIN party P ON PR.UserId = P.fCode
-            WHERE 1 = 1 ";
+            P.userName,
+            PR.RazorpayOrderId,
+            PR.RazorpayPaymentId,
+            PR.RazorpaySignature,
+            PR.Amount,
+            PR.Status,
+            PR.CONTACT,
+            PR.PaymentTime,
+            PR.VerificationTime,
+            PR.FpaymentType
+        FROM PaymentRecords PR
+        JOIN RegisterUsers P ON PR.UserId = P.userId
+        WHERE 1 = 1 ";
 
             // User filter
             if (!string.IsNullOrEmpty(filter.UserId))
@@ -138,7 +168,7 @@ namespace CHITSCHEME.Controllers
         {
             return new PaymentRecordDto
             {
-                fAcname = reader["fAcname"]?.ToString(),
+                fAcname = reader["userName"]?.ToString(),
                 RazorpayOrderId = reader["RazorpayOrderId"]?.ToString(),
                 RazorpayPaymentId = reader["RazorpayPaymentId"]?.ToString(),
                 RazorpaySignature = reader["RazorpaySignature"]?.ToString(),

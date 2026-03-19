@@ -1,6 +1,4 @@
-﻿using System;
-using System.Reflection.PortableExecutable;
-using CHITSCHEME.Helpers;
+﻿using CHITSCHEME.Helpers;
 using CHITSCHEME.Models;
 using JEWELLBISREACT.DBConnection;
 using Microsoft.AspNetCore.Authorization;
@@ -9,6 +7,10 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Hosting;
+using Razorpay.Api;
+using System;
+using System.Data;
+using System.Reflection.PortableExecutable;
 
 namespace CHITSCHEME.Controllers
 {
@@ -321,61 +323,173 @@ namespace CHITSCHEME.Controllers
                         });
                     }
                 }
+                var schemeQuery = @"WITH RankedSchemes AS (
+    SELECT 
+        P.FCODE,
+        P.FACNAME,
+        P.FPHONE,
+        P.FAMOUNT,
+        P.FCOMPCODE,
+        P.FDUE,
+        P.FDIGICR,
+        P.FDIGITYPE,
+        P.FID AS SCHEMECODE,
+        P.FSCHEMETYPE,
+
+        -- ✅ Correct PaidDue (COUNT of all payments)
+        ISNULL(PD.PaidCount, 0) AS PaidDue,
+
+        -- ✅ Due comparison
+        CASE 
+            WHEN PD.PaidCount IS NULL THEN 'N'
+            WHEN P.FDUE = PD.PaidCount THEN 'Y'
+            ELSE 'N'
+        END AS FDUE_Comparison,
+
+        PARENT.FACNAME AS SCHEMENAME,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY P.FID 
+            ORDER BY ISNULL(L.FDUE, 0) DESC
+        ) AS rn,
+
+        -- ✅ Current month paid check (include NULL + N)
+        CASE 
+            WHEN EXISTS (
+                SELECT 1 
+                FROM LEDGER L3
+                LEFT JOIN BLEDGER B3 
+                    ON B3.FVOUCHNO = L3.FVRNO
+                WHERE 
+                    L3.FID = P.FID 
+                    AND L3.FDATE BETWEEN 
+                        DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) 
+                        AND EOMONTH(GETDATE())
+                    AND L3.fCrDb = 'CR' 
+                    AND L3.FTYPE = 'CT'
+                    -- 🔥 No restriction on FONLINE
+            ) THEN 'Y'
+            ELSE 'N'
+        END AS IS_CURRENT_MONTH_PAID
+
+    FROM PARTY P
+
+    -- ✅ Latest transaction (for display only)
+    LEFT JOIN (
+        SELECT 
+            L1.FID,
+            L1.FVRNO,
+            L1.FDUE,
+            L1.FVRAMOUNT
+        FROM LEDGER L1
+        INNER JOIN (
+            SELECT 
+                FID, 
+                MAX(FVRNO) AS MaxFVRNO
+            FROM LEDGER
+            WHERE fCrDb = 'CR' 
+              AND FTYPE = 'CT'
+            GROUP BY FID
+        ) AS MaxRows 
+            ON L1.FID = MaxRows.FID 
+           AND L1.FVRNO = MaxRows.MaxFVRNO
+    ) L ON P.FID = L.FID
+
+    -- ✅ PaidDue COUNT logic
+    LEFT JOIN (
+        SELECT 
+            Lx.FID,
+            COUNT(*) AS PaidCount
+        FROM LEDGER Lx
+        LEFT JOIN BLEDGER Bx 
+            ON Bx.FVOUCHNO = Lx.FVRNO
+        WHERE 
+            Lx.fCrDb = 'CR'
+            AND Lx.FTYPE = 'CT'
+            -- 🔥 Include ALL (Y, N, NULL)
+        GROUP BY Lx.FID
+    ) PD ON PD.FID = P.FID
+
+    -- ✅ Parent scheme name
+    LEFT JOIN PARTY PARENT 
+        ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+
+    WHERE 
+        P.FPHONE = @phone
+        AND P.FPARENT LIKE '0000100044%'
+)
+
+SELECT *
+FROM RankedSchemes
+WHERE rn = 1;";
+
 
                 // ✅ 2. Fetch Schemes
-                var schemeQuery = @"WITH RankedSchemes AS (
-            SELECT 
-                P.FCODE,
-                P.FACNAME,
-                P.FPHONE,
-                P.FAMOUNT,
-                P.FCOMPCODE,
-                P.FDUE,
-                P.FDIGICR,
-                P.FDIGITYPE,
-                P.FID AS SCHEMECODE,
-                P.FSCHEMETYPE,
-                CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
-                IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
-                PARENT.FACNAME AS SCHEMENAME,
-                ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
-                CASE 
-                  WHEN EXISTS (
-                    SELECT 1 
-                    FROM LEDGER L3
-                    JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
-                    WHERE 
-                      L3.FID = P.FID 
-                       AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
-                      AND L3.fCrDb = 'CR' 
-                      AND L3.FTYPE = 'CT'
-                  ) THEN 'Y'
-                  ELSE 'N'
-                END AS IS_CURRENT_MONTH_PAID
-            FROM PARTY P
-            LEFT JOIN (
-                SELECT 
-                    L1.FID,
-                    L1.FVRNO,
-                    L1.FDUE,
-                    L1.FVRAMOUNT
-                FROM LEDGER L1
-                INNER JOIN (
-                    SELECT FID, MAX(FVRNO) AS MaxFVRNO
-                    FROM LEDGER L2
-                    JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
-                    WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
-                    GROUP BY L2.FID
-                ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
-                JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
-                WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
-            ) L ON P.FID = L.FID
-            LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
-            WHERE P.FPHONE = @phone AND P.FPARENT LIKE '0000100044%'
-        )
-        SELECT *
-        FROM RankedSchemes
-        WHERE rn = 1;";
+                //        var schemeQuery = @"WITH RankedSchemes AS (
+                //    SELECT 
+                //        P.FCODE,
+                //        P.FACNAME,
+                //        P.FPHONE,
+                //        P.FAMOUNT,
+                //        P.FCOMPCODE,
+                //        P.FDUE,
+                //        P.FDIGICR,
+                //        P.FDIGITYPE,
+                //        P.FID AS SCHEMECODE,
+                //        P.FSCHEMETYPE,
+                //        CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
+                //        IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
+                //        PARENT.FACNAME AS SCHEMENAME,
+                //        ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
+                //        CASE 
+                //          WHEN EXISTS (
+                //            SELECT 1 
+                //            FROM LEDGER L3
+                //            JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
+                //            WHERE 
+                //              L3.FID = P.FID 
+                //               AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
+                //              AND L3.fCrDb = 'CR' 
+                //              AND L3.FTYPE = 'CT'
+                //          ) THEN 'Y'
+                //          ELSE 'N'
+                //        END AS IS_CURRENT_MONTH_PAID
+                //    FROM PARTY P
+                //    LEFT JOIN (
+                //        SELECT 
+                //            L1.FID,
+                //            L1.FVRNO,
+                //            L1.FDUE,
+                //            L1.FVRAMOUNT
+                //        FROM LEDGER L1
+                //        INNER JOIN (
+                //            SELECT FID, MAX(FVRNO) AS MaxFVRNO
+                //            FROM LEDGER L2
+                //            JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
+                //            WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
+                //            GROUP BY L2.FID
+                //        ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
+                //        JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
+                //        WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
+                //    ) L ON P.FID = L.FID
+                //    LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+                //    WHERE P.FPHONE = @phone AND P.FPARENT LIKE '0000100044%'
+                //)
+                //SELECT *
+                //FROM RankedSchemes
+                //WHERE rn = 1;";
+
+                decimal rate22K = 0;
+
+                var rateQuery = "SELECT FRATE FROM Division WHERE FCODE = '0002'";
+                using (var rateCmd = new SqlCommand(rateQuery, connection))
+                {
+                    var result = await rateCmd.ExecuteScalarAsync();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        rate22K = Convert.ToDecimal(result);
+                    }
+                }
 
                 CommonDto common = null;
                 var chList = new List<object>();
@@ -401,6 +515,23 @@ namespace CHITSCHEME.Controllers
                         };
                     }
 
+                    decimal weight = 0;
+
+
+                    var schemeType = reader["FSCHEMETYPE"] == DBNull.Value ||
+                 string.IsNullOrWhiteSpace(reader["FSCHEMETYPE"].ToString())
+                 ? "R"
+                 : reader["FSCHEMETYPE"].ToString();
+
+                    decimal amount = 0;
+                    decimal.TryParse(reader["FAMOUNT"]?.ToString(), out amount);
+
+                    decimal weightch = 0;
+
+                    if (schemeType == "W" && reader["FDIGITYPE"]?.ToString() == "CH" && rate22K > 0)
+                    {
+                        weight = amount / rate22K;
+                    }
                     var scheme = new
                     {
                         fcode = reader["FCODE"]?.ToString(),
@@ -412,7 +543,11 @@ namespace CHITSCHEME.Controllers
                         fdue_comparison = reader["FDUE_Comparison"]?.ToString(),
                         iS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]?.ToString(),
                         fdigicr = reader["FDIGICR"]?.ToString(),
-                        fcompcode = reader["FCOMPCODE"]?.ToString()
+                        FSCHEMETYPE = reader["FSCHEMETYPE"] == DBNull.Value ||string.IsNullOrWhiteSpace(reader["FSCHEMETYPE"].ToString())? "R": reader["FSCHEMETYPE"].ToString(),
+                         fcompcode = reader["FCOMPCODE"]?.ToString(),
+                        weight = weight > 0 ? weight.ToString("0.000") : null
+
+
                     };
 
                     var digiType = reader["FDIGITYPE"]?.ToString();
@@ -554,7 +689,7 @@ namespace CHITSCHEME.Controllers
                 L.FWT
             FROM LEDGER L
             JOIN PARTY P ON P.FID = L.FID
-            JOIN BLEDGER B ON B.FVOUCHNO = L.FVRNO AND B.FONLINE = 'Y'
+            JOIN BLEDGER B ON B.FVOUCHNO = L.FVRNO 
             WHERE 
                 L.FID = @FID 
                 AND L.FCRDB = 'CR' 
@@ -683,7 +818,21 @@ namespace CHITSCHEME.Controllers
                 return cmd.ExecuteScalar() != null;
             }
         }
+        private int GetNextFDUE(SqlConnection conn, SqlTransaction transaction, string schemeCode)
+        {
+            string query = "SELECT ISNULL(MAX(FDUE), 0) FROM ledger WHERE fid = @fid";
 
+            using (SqlCommand cmd = new SqlCommand(query, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@fid", schemeCode);
+
+                var result = cmd.ExecuteScalar();
+
+                int maxFDUE = result != DBNull.Value ? Convert.ToInt32(result) : 0;
+
+                return maxFDUE + 1; // 🔥 increment here
+            }
+        }
 
         [HttpPost("InsertChitScheme")]
         public IActionResult InsertChitScheme([FromBody] ChitSchemeModel model)
@@ -706,12 +855,20 @@ namespace CHITSCHEME.Controllers
 
                         //foreach (var voucherNo in voucherNos)
                         //{
-                            //if (SchemeNameExists(conn, transaction, voucherNo))
-                            //{
-                            //    return Conflict(new { message = $"Voucher number {voucherNo} already exists. Please choose a different one." });
-                            //}
+                        //if (SchemeNameExists(conn, transaction, voucherNo))
+                        //{
+                        //    return Conflict(new { message = $"Voucher number {voucherNo} already exists. Please choose a different one." });
+                        //}
                         //}
 
+
+
+                        foreach (var item in model.SchemeDetails)
+                        {
+                            int nextDue = GetNextFDUE(conn, transaction, item.SchemeCode);
+
+                            item.FDUE = nextDue.ToString(); // assign back to model
+                        }
 
                         InsertBledger(model.SchemeDetails, voucherNo, conn, transaction);
                         InsertLedger(model.SchemeDetails, voucherNo, conn, transaction);
@@ -772,8 +929,8 @@ namespace CHITSCHEME.Controllers
                     cmd.Parameters.AddWithValue("@FSMSSALES", "N");
                     cmd.Parameters.AddWithValue("@FSMSCHIT", "N");
                     cmd.Parameters.AddWithValue("@FINT", "0");
-                    cmd.Parameters.AddWithValue("@fwt", "0");
-                    cmd.Parameters.AddWithValue("@FRATE", "0");
+                    cmd.Parameters.AddWithValue("@fwt", item.Weight ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FRATE", item.Amount);
                     cmd.Parameters.AddWithValue("@FCARD", "0");
                     cmd.Parameters.AddWithValue("@FUPI", item.Amount);
                     cmd.Parameters.AddWithValue("@FNEFT", "0");

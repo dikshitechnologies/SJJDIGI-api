@@ -47,7 +47,7 @@ namespace CHITSCHEME.Controllers.SHEME
                     string query = @"
                         SELECT fcode, facName, fParent,fdue,FAMOUNT,FSCHEMETYPE
                         FROM party
-                        WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2
+                        WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2 AND fShow ='1'
                         ORDER BY fParent, fcode";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
@@ -237,6 +237,14 @@ namespace CHITSCHEME.Controllers.SHEME
                         fschemetypeValue = "W"; // Override fschemetype for digital schemes
                 }
 
+                decimal finalDue = customer.due ?? 0;
+
+                // If Digi Gold or Digi Silver → set due = 100
+                if (digiTypeValue == "DG" || digiTypeValue == "DS")
+                {
+                    finalDue = 100;
+                }
+
                 // ------------------ Insert customer into party ------------------
                 string insertQuery = @"
             INSERT INTO party 
@@ -259,7 +267,7 @@ namespace CHITSCHEME.Controllers.SHEME
                     cmd.Parameters.AddWithValue("@fmail", customer.email ?? "");
                     cmd.Parameters.AddWithValue("@fdate", DateTime.Now);
                     cmd.Parameters.AddWithValue("@famount", customer.amount);
-                    cmd.Parameters.AddWithValue("@fdue", customer.due);
+                    cmd.Parameters.AddWithValue("@fdue", finalDue);
                     cmd.Parameters.AddWithValue("@fschemetype", fschemetypeValue.ToUpper());
                     cmd.Parameters.AddWithValue("@digiType", digiTypeValue);
                     cmd.Parameters.AddWithValue("@Fdigicr", customer.digiCr.ToUpper() ?? "");

@@ -161,51 +161,53 @@ namespace CHITSCHEME.Controllers.Jewellery
                 {
                     await conn.OpenAsync();
 
+      
                     string query = @"
-            SELECT 
-                P.FACNAME, 
-                p.fPhone,
-                B.fVouchno, 
-                I.fItemName, 
-                IP.fImage1, 
-                IT.fAmount, 
-                B.FVOUCHDT, 
-                IT.FproductID, 
-                IT.fTotQty,
-                B.FPAYMENTTYPE
-            FROM 
-                BLEDGER B  
-            JOIN 
-                ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
-            JOIN 
-                ItemPurchaseOP IP ON IP.fID = IT.FproductID
-            JOIN 
-                PARTY P ON P.FCODE = B.fCucode 
-            JOIN 
-                ITEM I ON I.fItemcode = IT.fItemcode 
-            WHERE 
-                B.fvType = 'OD' 
-                AND B.FORDERSTATUS = 'N'
+            
+ SELECT 
+    P.UserName, 
+    p.PhoneNumber,
+    B.fVouchno, 
+    I.fItemName, 
+    IP.fImage1, 
+    IT.fAmount, 
+    B.FVOUCHDT, 
+    IT.FproductID, 
+    IT.fTotQty,
+    B.FPAYMENTTYPE
+FROM 
+    BLEDGER B  
+JOIN 
+    ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+JOIN 
+    ItemPurchaseOP IP ON IP.fID = IT.FproductID
+JOIN 
+    RegisterUsers P ON P.USERID = B.fCucode 
+JOIN 
+    ITEM I ON I.fItemcode = IT.fItemcode 
+WHERE 
+    B.fvType = 'OD' 
+    AND B.FORDERSTATUS = 'N'
 
-                AND (
-                    @PaymentType IS NULL OR
-                    (@PaymentType = 'COD' AND B.FPAYMENTTYPE = 'N') OR
-                    (@PaymentType = 'ONLINE' AND B.FPAYMENTTYPE = 'Y')
-                )
+    AND (
+        @PaymentType IS NULL OR
+        (@PaymentType = 'COD' AND B.FPAYMENTTYPE = 'N') OR
+        (@PaymentType = 'ONLINE' AND B.FPAYMENTTYPE = 'Y')
+    )
 
-                AND (
-                    @SearchTerm IS NULL OR
-                    P.FACNAME LIKE '%' + @SearchTerm + '%' OR
-                    I.fItemName LIKE '%' + @SearchTerm + '%' OR
-                    B.fVouchno LIKE '%' + @SearchTerm + '%'
-                )
+    AND (
+        @SearchTerm IS NULL OR
+        P.USERNAME LIKE '%' + @SearchTerm + '%' OR
+        I.fItemName LIKE '%' + @SearchTerm + '%' OR
+        B.fVouchno LIKE '%' + @SearchTerm + '%'
+    )
 
-                AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
-                AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
+    AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
+    AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
 
-            ORDER BY 
-                B.FVOUCHDT DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+ORDER BY 
+    B.FVOUCHDT DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
@@ -222,8 +224,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                             {
                                 results.Add(new
                                 {
-                                    PartyName = reader["FACNAME"].ToString(),
-                                    fPhone = reader["fPhone"].ToString(),
+                                    PartyName = reader["UserName"].ToString(),
+                                    fPhone = reader["PhoneNumber"].ToString(),
                                     VoucherNo = reader["fVouchno"].ToString(),
                                     ItemName = reader["fItemName"].ToString(),
                                     Image = reader["fImage1"]?.ToString(),
@@ -269,50 +271,54 @@ namespace CHITSCHEME.Controllers.Jewellery
                     await conn.OpenAsync();
 
                     string query = @"
-            SELECT 
-                P.FACNAME, 
-                p.fPhone,
-                B.fVouchno, 
-                I.fItemName, 
-                IP.fImage1, 
-                IT.fAmount, 
-                B.FVOUCHDT, 
-                IT.FproductID, 
-                IT.fTotQty,
-                B.FPAYMENTTYPE
-            FROM 
-                BLEDGER B  
-            JOIN 
-                ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
-            JOIN 
-                ItemPurchaseOP IP ON IP.fID = IT.FproductID
-            JOIN 
-                PARTY P ON P.FCODE = B.fCucode 
-            JOIN 
-                ITEM I ON I.fItemcode = IT.fItemcode 
-            WHERE 
-                B.fvType = 'OD' 
-                AND B.FPAYMENTTYPE = 'Y'
+           
 
-                AND (
-                    @PaymentType IS NULL OR
-                    (@PaymentType = 'COD' AND B.FPAYMENTTYPE = 'N') OR
-                    (@PaymentType = 'ONLINE' AND B.FPAYMENTTYPE = 'Y')
-                )
 
-                AND (
-                    @SearchTerm IS NULL OR
-                    P.FACNAME LIKE '%' + @SearchTerm + '%' OR
-                    I.fItemName LIKE '%' + @SearchTerm + '%' OR
-                    B.fVouchno LIKE '%' + @SearchTerm + '%'
-                )
+ SELECT 
+     P.UserName, 
+     p.PhoneNumber,
+     B.fVouchno, 
+     I.fItemName, 
+     IP.fImage1, 
+     IT.fAmount, 
+     B.FVOUCHDT, 
+     IT.FproductID, 
+     IT.fTotQty,
+     B.FPAYMENTTYPE
+ FROM 
+     BLEDGER B  
+ JOIN 
+     ItemTransactionOP IT ON IT.fVoucher = B.fVouchno
+ JOIN 
+     ItemPurchaseOP IP ON IP.fID = IT.FproductID
+ JOIN 
+     RegisterUsers P ON P.UserID = B.fCucode 
+ JOIN 
+     ITEM I ON I.fItemcode = IT.fItemcode 
+ WHERE 
+     B.fvType = 'OD' 
+     AND B.FORDERSTATUS = 'Y'
 
-                AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
-                AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
+     AND (
+         @PaymentType IS NULL OR
+         (@PaymentType = 'COD' AND B.FPAYMENTTYPE = 'N') OR
+         (@PaymentType = 'ONLINE' AND B.FPAYMENTTYPE = 'Y')
+     )
 
-            ORDER BY 
-                B.FVOUCHDT DESC
-            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+     AND (
+         @SearchTerm IS NULL OR
+         P.UserName LIKE '%' + @SearchTerm + '%' OR
+         I.fItemName LIKE '%' + @SearchTerm + '%' OR
+         B.fVouchno LIKE '%' + @SearchTerm + '%'
+     )
+
+     AND (@FromDate IS NULL OR B.FVOUCHDT >= @FromDate)
+     AND (@ToDate IS NULL OR B.FVOUCHDT < DATEADD(DAY, 1, @ToDate))
+
+ ORDER BY 
+     B.FVOUCHDT DESC
+ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
+";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
@@ -329,8 +335,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                             {
                                 results.Add(new
                                 {
-                                    PartyName = reader["FACNAME"].ToString(),
-                                    fPhone = reader["fPhone"].ToString(),
+                                    PartyName = reader["UserName"].ToString(),
+                                    fPhone = reader["PhoneNumber"].ToString(),
                                     VoucherNo = reader["fVouchno"].ToString(),
                                     ItemName = reader["fItemName"].ToString(),
                                     Image = reader["fImage1"]?.ToString(),
@@ -498,16 +504,16 @@ namespace CHITSCHEME.Controllers.Jewellery
                 // 🔹 COUNT QUERY
                 string countQuery = @"
         SELECT COUNT(*)
-        FROM bledger b
-        JOIN party p ON p.fcode = b.fCucode
-        WHERE b.fvtype = 'od'
-          AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
-          AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
-          AND (@paymentFilter = '' 
-               OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
-               OR (@paymentFilter = 'COD' AND (b.fpaymenttype IS NULL OR b.fpaymenttype = '')))
-          AND (p.fAcname LIKE '%' + @search + '%'
-               OR p.fphone LIKE '%' + @search + '%')";
+  FROM bledger b
+  JOIN RegisterUsers p ON p.UserID = b.fCucode
+  WHERE b.fvtype = 'od'
+    AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
+    AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
+    AND (@paymentFilter = '' 
+         OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
+         OR (@paymentFilter = 'COD' AND (b.fpaymenttype IS NULL OR b.fpaymenttype = '')))
+    AND (p.UserName LIKE '%' + @search + '%'
+         OR p.PhoneNumber LIKE '%' + @search + '%')";
 
                 using (SqlCommand cmd = new SqlCommand(countQuery, con))
                 {
@@ -521,28 +527,28 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 // 🔹 DATA QUERY
                 string dataQuery = @"
-        SELECT 
-            p.fcode,
-            p.fAcname,
-            p.fphone,
-            b.fBillAmt,
-            b.fVouchdt,
-            CASE 
-                WHEN b.fpaymenttype = 'Y' THEN 'ONLINE'
-                ELSE 'COD'
-            END AS PaymentType
-        FROM bledger b
-        JOIN party p ON p.fcode = b.fCucode
-        WHERE b.fvtype = 'od'
-          AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
-          AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
-          AND (@paymentFilter = '' 
-               OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
-               OR (@paymentFilter = 'COD' AND (b.fpaymenttype IS NULL OR b.fpaymenttype = '')))
-          AND (p.fAcname LIKE '%' + @search + '%'
-               OR p.fphone LIKE '%' + @search + '%')
-        ORDER BY b.fVouchdt DESC
-        OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
+         SELECT 
+    p.userId,
+    p.UserName,
+    p.PhoneNumber,
+    b.fBillAmt,
+    b.fVouchdt,
+    CASE 
+        WHEN b.fpaymenttype = 'Y' THEN 'ONLINE'
+        ELSE 'COD'
+    END AS PaymentType
+FROM bledger b
+JOIN RegisterUsers p ON p.UserID = b.fCucode
+WHERE b.fvtype = 'od'
+  AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
+  AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
+  AND (@paymentFilter = '' 
+       OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
+       OR (@paymentFilter = 'COD' AND (b.fpaymenttype IS NULL OR b.fpaymenttype = '')))
+  AND (p.UserName LIKE '%' + @search + '%'
+       OR p.PhoneNumber LIKE '%' + @search + '%')
+ORDER BY b.fVouchdt DESC
+OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
                 using (SqlCommand cmd = new SqlCommand(dataQuery, con))
                 {
@@ -573,9 +579,9 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                             records.Add(new
                             {
-                                FCode = dr["fcode"].ToString(),
-                                Name = dr["fAcname"].ToString(),
-                                Phone = dr["fphone"].ToString(),
+                                FCode = dr["userId"].ToString(),
+                                Name = dr["UserName"].ToString(),
+                                Phone = dr["PhoneNumber"].ToString(),
                                 BillAmount = amt,
                                 VoucherDate = Convert.ToDateTime(dr["fVouchdt"]),
                                 PaymentType = type

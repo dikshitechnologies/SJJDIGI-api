@@ -212,16 +212,28 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                     string query = @"
                 	SELECT 
-                    p.facName AS Name,
-                    p.fStreet AS Street,
-                    p.fArea AS Area,
-                    p.fCity AS City,
-                    p.FSTAT AS State,
-                    p.fPhone AS Phone,
-                    p.fMail AS Email
+                    p.username AS Name,
+                    p.Addressline AS Street,
+                    p.City AS City,
+                    p.STATe AS State,
+                    p.PhoneNumber AS Phone,
+                    p.email AS Email
                 FROM BLEDGER b
-                JOIN Party p ON p.fCode = b.fCucode
+                JOIN RegisterUsers p 
+                    ON CAST(p.userid AS NVARCHAR(50)) = b.fCucode
                 WHERE b.FVOUCHNO = @VoucherNo";
+                //    string query = @"
+                //	SELECT 
+                //    p.facName AS Name,
+                //    p.fStreet AS Street,
+                //    p.fArea AS Area,
+                //    p.fCity AS City,
+                //    p.FSTAT AS State,
+                //    p.fPhone AS Phone,
+                //    p.fMail AS Email
+                //FROM BLEDGER b
+                //JOIN Party p ON p.fCode = b.fCucode
+                //WHERE b.FVOUCHNO = @VoucherNo";
 
                     using (SqlCommand cmd = new SqlCommand(query, con))
                     {
@@ -235,7 +247,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                                 {
                                     Name = reader["Name"].ToString(),
                                     Street = reader["Street"].ToString(),
-                                    Area = reader["Area"].ToString(),
+                                    //Area = reader["Area"].ToString(),
+                                    Area = "",
                                     City = reader["City"].ToString(),
                                     State = reader["State"].ToString(),
                                     Phone = reader["Phone"].ToString(),
@@ -281,8 +294,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                     it.fGms AS Weight,
                     it.FAMOUNT AS Price,
                     it.fRate AS Rate,
-                    (it.FAMOUNT * 0.03) AS Tax, 
-                    (it.FAMOUNT + (it.FAMOUNT * 0.03)) AS Total
+                    (it.FAMOUNT * (ip.ftax/100)) AS Tax, 
+                     (it.FAMOUNT + (it.FAMOUNT * (ip.ftax/100))) AS Total
                 FROM itemtransactionop it
                 JOIN itempurchaseop ip ON ip.Itemcode = it.FItemcode AND ip.FID = it.fproductId
                 JOIN item i ON i.fItemcode = it.FItemcode
