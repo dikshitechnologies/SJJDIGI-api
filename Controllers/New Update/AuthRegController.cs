@@ -77,7 +77,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 int userId = 0;
 
                 var regDetailsCmd = new SqlCommand(
-                    "SELECT UserId, UserName, Email FROM RegisterUsers WHERE PhoneNumber = @phone",
+                    "SELECT UserId, UserName, Email,PhoneNumber FROM RegisterUsers WHERE PhoneNumber = @phone",
                     connection);
                 regDetailsCmd.Parameters.AddWithValue("@phone", request.Phone);
 
@@ -88,6 +88,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                         userId = Convert.ToInt32(reader["UserId"]);
                         username = reader["UserName"].ToString();
                         email = reader["Email"].ToString();
+                        partyPhone = reader["PhoneNumber"].ToString();
                     }
                 }
 
