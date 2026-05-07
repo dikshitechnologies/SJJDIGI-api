@@ -47,7 +47,7 @@ namespace CHITSCHEME.Controllers.SHEME
                     string query = @"
                         SELECT fcode, facName, fParent,fdue,FAMOUNT,FSCHEMETYPE
                         FROM party
-                        WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2 AND fShow ='1'
+                        WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2 
                         ORDER BY fParent, fcode";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
@@ -224,17 +224,33 @@ namespace CHITSCHEME.Controllers.SHEME
                 if (!string.IsNullOrEmpty(customer.digiType))
                 {
                     string digiUpper = customer.digiType.ToUpper();
-                    if (digiUpper=="DIGI GOLD" || digiUpper == "DG")
+                    if (digiUpper == "DIGI GOLD" || digiUpper == "DG")
                         digiTypeValue = "DG";
-                    else if (digiUpper== "DIGI SILVER" || digiUpper == "DS")
+                    else if (digiUpper == "DIGI SILVER" || digiUpper == "DS")
                         digiTypeValue = "DS";
-                    else if (digiUpper == "CH" || digiUpper == "ch")
-                        digiTypeValue = "CH";
-                    else
-                        return BadRequest(new { message = "Invalid digiType. Use 'DG', 'DS', 'Digi Gold', 'Digi Silver', 'None' or 'NA'." });
+                    else if (digiUpper == "WT")
+                    {
+                        digiTypeValue = "WT";
+                        fschemetypeValue = "W";
 
-                    if (digiTypeValue != "") // If digital scheme
-                        fschemetypeValue = "W"; // Override fschemetype for digital schemes
+                        if (string.IsNullOrEmpty(customer.digiCr))
+                        {
+                            return BadRequest(new
+                            {
+                                message = "22K or 24K is required for WT digiType."
+                            });
+                        }
+                    }
+                    else if (digiUpper == "AT" || digiUpper == "at")
+                    {
+                        fschemetypeValue = "";
+                        digiTypeValue = "AT";
+                    }
+                    else
+                        return BadRequest(new { message = "Invalid digiType. Use 'Digi Gold', 'Digi Silver', 'WT', 'AT'." });
+
+                    //if (digiTypeValue != "") // If digital scheme
+                    //    fschemetypeValue = "W";
                 }
 
                 decimal finalDue = customer.due ?? 0;
@@ -248,9 +264,9 @@ namespace CHITSCHEME.Controllers.SHEME
                 // ------------------ Insert customer into party ------------------
                 string insertQuery = @"
             INSERT INTO party 
-            (fcode, facname, fparent, faclevel, fstreet, farea, fcity, fpincode, fphone, fmail, fdate, famount, fdue, fid,   fschemetype, FdigiType, Fdigicr)
+            (fcode, facname, fparent, faclevel, fstreet, farea, fcity, fpincode, fphone, fmail, fdate, famount, fdue, fid,   fschemetype, FdigiType, Fdigicr,fshow)
             VALUES 
-            (@fcode, @facname, @fparent, @faclevel, @fstreet, @farea, @fcity, @fpincode, @fphone, @fmail, @fdate, @famount, @fdue,  @fid,   @fschemetype, @digiType, @Fdigicr);";
+            (@fcode, @facname, @fparent, @faclevel, @fstreet, @farea, @fcity, @fpincode, @fphone, @fmail, @fdate, @famount, @fdue,  @fid,   @fschemetype, @digiType, @Fdigicr,'1');";
 
                 using (SqlCommand cmd = new SqlCommand(insertQuery, con, transaction))
                 {

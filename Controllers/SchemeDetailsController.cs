@@ -323,8 +323,9 @@ namespace CHITSCHEME.Controllers
                         });
                     }
                 }
-                var schemeQuery = @"WITH RankedSchemes AS (
-    SELECT 
+                var schemeQuery = @"
+WITH RankedSchemes AS (
+    SELECT
         P.FCODE,
         P.FACNAME,
         P.FPHONE,
@@ -336,47 +337,49 @@ namespace CHITSCHEME.Controllers
         P.FID AS SCHEMECODE,
         P.FSCHEMETYPE,
 
-        -- ✅ Correct PaidDue (COUNT of all payments)
-        ISNULL(PD.PaidCount, 0) AS PaidDue,
-
-        -- ✅ Due comparison
+        -- Paid Due (based on latest online payment)
         CASE 
-            WHEN PD.PaidCount IS NULL THEN 'N'
-            WHEN P.FDUE = PD.PaidCount THEN 'Y'
-            ELSE 'N'
-        END AS FDUE_Comparison,
+            WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 
+            ELSE 1 
+        END AS PaidDue,
 
+        -- Due comparison
+        IIF(L.FDUE IS NULL, 'N', 
+            IIF(P.FDUE = L.FDUE, 'Y', 'N')
+        ) AS FDUE_Comparison,
+
+        -- Scheme name
         PARENT.FACNAME AS SCHEMENAME,
 
-        ROW_NUMBER() OVER (
+        -- Ranking
+        ROW_NUMBER() OVER(
             PARTITION BY P.FID 
             ORDER BY ISNULL(L.FDUE, 0) DESC
         ) AS rn,
 
-        -- ✅ Current month paid check (include NULL + N)
-        CASE 
-            WHEN EXISTS (
-                SELECT 1 
-                FROM LEDGER L3
-                LEFT JOIN BLEDGER B3 
-                    ON B3.FVOUCHNO = L3.FVRNO
-                WHERE 
-                    L3.FID = P.FID 
-                    AND L3.FDATE BETWEEN 
-                        DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) 
-                        AND EOMONTH(GETDATE())
-                    AND L3.fCrDb = 'CR' 
-                    AND L3.FTYPE = 'CT'
-                    -- 🔥 No restriction on FONLINE
-            ) THEN 'Y'
-            ELSE 'N'
-        END AS IS_CURRENT_MONTH_PAID
+        -- Current month paid (only ONLINE payments)
+       CASE
+    WHEN EXISTS(
+        SELECT 1
+        FROM LEDGER L3
+        JOIN BLEDGER B3 
+            ON B3.FVOUCHNO = L3.FVRNO
+        WHERE
+            L3.FID = P.FID
+            AND L3.FDATE >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
+            AND L3.FDATE < DATEADD(MONTH, 1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+            AND L3.fCrDb = 'CR'
+            AND L3.FTYPE = 'CT'
+            AND ISNULL(B3.FONLINE, 'Y') = 'Y'
+    ) THEN 'Y'
+    ELSE 'N'
+END AS IS_CURRENT_MONTH_PAID
 
     FROM PARTY P
 
-    -- ✅ Latest transaction (for display only)
-    LEFT JOIN (
-        SELECT 
+    -- Latest ONLINE transaction
+    LEFT JOIN(
+        SELECT
             L1.FID,
             L1.FVRNO,
             L1.FDUE,
@@ -384,44 +387,159 @@ namespace CHITSCHEME.Controllers
         FROM LEDGER L1
         INNER JOIN (
             SELECT 
-                FID, 
-                MAX(FVRNO) AS MaxFVRNO
-            FROM LEDGER
-            WHERE fCrDb = 'CR' 
-              AND FTYPE = 'CT'
-            GROUP BY FID
+                L2.FID, 
+                MAX(L2.FVRNO) AS MaxFVRNO
+            FROM LEDGER L2
+            JOIN BLEDGER B2 
+                ON B2.FVOUCHNO = L2.FVRNO
+            WHERE 
+                L2.fCrDb = 'CR' 
+                AND L2.FTYPE = 'CT' 
+                AND B2.FONLINE = 'Y'
+            GROUP BY L2.FID
         ) AS MaxRows 
             ON L1.FID = MaxRows.FID 
            AND L1.FVRNO = MaxRows.MaxFVRNO
+
+        JOIN BLEDGER B1 
+            ON B1.FVOUCHNO = L1.FVRNO 
+           AND B1.FONLINE = 'Y'
+
+        WHERE 
+            L1.fCrDb = 'CR' 
+            AND L1.FTYPE = 'CT'
     ) L ON P.FID = L.FID
 
-    -- ✅ PaidDue COUNT logic
-    LEFT JOIN (
-        SELECT 
-            Lx.FID,
-            COUNT(*) AS PaidCount
-        FROM LEDGER Lx
-        LEFT JOIN BLEDGER Bx 
-            ON Bx.FVOUCHNO = Lx.FVRNO
-        WHERE 
-            Lx.fCrDb = 'CR'
-            AND Lx.FTYPE = 'CT'
-            -- 🔥 Include ALL (Y, N, NULL)
-        GROUP BY Lx.FID
-    ) PD ON PD.FID = P.FID
-
-    -- ✅ Parent scheme name
+    -- Parent scheme name
     LEFT JOIN PARTY PARENT 
         ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
 
+    -- ✅ FINAL FILTER
     WHERE 
-        P.FPHONE = @phone
+        P.FPHONE = @phone 
         AND P.FPARENT LIKE '0000100044%'
+        AND (
+            P.FSHOW = '1'
+            OR (
+                 P.FSCHEMETYPE NOT IN ('WT','AT','W')
+                 AND P.FDIGITYPE NOT IN ('DS','AT','WT')
+            )
+        )
 )
 
 SELECT *
 FROM RankedSchemes
-WHERE rn = 1;";
+WHERE rn = 1;
+";
+
+
+
+
+
+
+//var schemeQuery = @"WITH RankedSchemes AS (
+//    SELECT 
+//        P.FCODE,
+//        P.FACNAME,
+//        P.FPHONE,
+//        P.FAMOUNT,
+//        P.FCOMPCODE,
+//        P.FDUE,
+//        P.FDIGICR,
+//        P.FDIGITYPE,
+//        P.FID AS SCHEMECODE,
+//        P.FSCHEMETYPE,
+
+//        -- ✅ Correct PaidDue (COUNT of all payments)
+//        ISNULL(PD.PaidCount, 0) AS PaidDue,
+
+//        -- ✅ Due comparison
+//        CASE 
+//            WHEN PD.PaidCount IS NULL THEN 'N'
+//            WHEN P.FDUE = PD.PaidCount THEN 'Y'
+//            ELSE 'N'
+//        END AS FDUE_Comparison,
+
+//        PARENT.FACNAME AS SCHEMENAME,
+
+//        ROW_NUMBER() OVER (
+//            PARTITION BY P.FID 
+//            ORDER BY ISNULL(L.FDUE, 0) DESC
+//        ) AS rn,
+
+//        -- ✅ Current month paid check (include NULL + N)
+//        CASE 
+//            WHEN EXISTS (
+//                SELECT 1 
+//                FROM LEDGER L3
+//                LEFT JOIN BLEDGER B3 
+//                    ON B3.FVOUCHNO = L3.FVRNO
+//                WHERE 
+//                    L3.FID = P.FID 
+//                    AND L3.FDATE BETWEEN 
+//                        DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) 
+//                        AND EOMONTH(GETDATE())
+//                    AND L3.fCrDb = 'CR' 
+//                    AND L3.FTYPE = 'CT'
+//                    -- 🔥 No restriction on FONLINE
+//            ) THEN 'Y'
+//            ELSE 'N'
+//        END AS IS_CURRENT_MONTH_PAID
+
+//    FROM PARTY P
+
+//    -- ✅ Latest transaction (for display only)
+//    LEFT JOIN (
+//        SELECT 
+//            L1.FID,
+//            L1.FVRNO,
+//            L1.FDUE,
+//            L1.FVRAMOUNT
+//        FROM LEDGER L1
+//        INNER JOIN (
+//            SELECT 
+//                FID, 
+//                MAX(FVRNO) AS MaxFVRNO
+//            FROM LEDGER
+//            WHERE fCrDb = 'CR' 
+//              AND FTYPE = 'CT'
+//            GROUP BY FID
+//        ) AS MaxRows 
+//            ON L1.FID = MaxRows.FID 
+//           AND L1.FVRNO = MaxRows.MaxFVRNO
+//    ) L ON P.FID = L.FID
+
+//    -- ✅ PaidDue COUNT logic
+//    LEFT JOIN (
+//        SELECT 
+//            Lx.FID,
+//            COUNT(*) AS PaidCount
+//        FROM LEDGER Lx
+//        LEFT JOIN BLEDGER Bx 
+//            ON Bx.FVOUCHNO = Lx.FVRNO
+//        WHERE 
+//            Lx.fCrDb = 'CR'
+//            AND Lx.FTYPE = 'CT'
+//            -- 🔥 Include ALL (Y, N, NULL)
+//        GROUP BY Lx.FID
+//    ) PD ON PD.FID = P.FID
+
+//    -- ✅ Parent scheme name
+//    LEFT JOIN PARTY PARENT 
+//        ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
+
+//    WHERE 
+//        P.FPHONE = @phone
+//        AND P.FPARENT LIKE '0000100044%'
+//        AND (
+//        P.FSCHEMETYPE <> 'CH'
+//        OR (P.FDIGITYPE = 'CH' AND P.FSHOW = '1')
+//    )
+//)
+
+//SELECT *
+//FROM RankedSchemes
+//WHERE rn = 1;";
 
 
                 // ✅ 2. Fetch Schemes
@@ -480,6 +598,7 @@ WHERE rn = 1;";
                 //WHERE rn = 1;";
 
                 decimal rate22K = 0;
+                decimal rate24K = 0;
 
                 var rateQuery = "SELECT FRATE FROM Division WHERE FCODE = '0002'";
                 using (var rateCmd = new SqlCommand(rateQuery, connection))
@@ -488,6 +607,16 @@ WHERE rn = 1;";
                     if (result != null && result != DBNull.Value)
                     {
                         rate22K = Convert.ToDecimal(result);
+                    }
+                }
+
+                var rateQuery24k = "SELECT FRATE FROM Division WHERE FCODE = '0003'";
+                using (var rateCmd = new SqlCommand(rateQuery24k, connection))
+                {
+                    var result = await rateCmd.ExecuteScalarAsync();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        rate24K = Convert.ToDecimal(result);
                     }
                 }
 
@@ -527,10 +656,18 @@ WHERE rn = 1;";
                     decimal.TryParse(reader["FAMOUNT"]?.ToString(), out amount);
 
                     decimal weightch = 0;
-
-                    if (schemeType == "W" && reader["FDIGITYPE"]?.ToString() == "CH" && rate22K > 0)
+                    var fdigicr = reader["FDIGICR"]?.ToString();
+                    if (schemeType == "W" && reader["FDIGITYPE"]?.ToString() == "WT" )
                     {
-                        weight = amount / rate22K;
+                        if(fdigicr == "22K" && rate22K != 0)
+                        {
+                            weight = amount / rate22K;
+                        }
+                        else if(fdigicr == "24K" && rate24K != 0)
+                        {
+                            weight = amount / rate24K;
+                        }
+                      
                     }
                     var scheme = new
                     {
@@ -552,7 +689,7 @@ WHERE rn = 1;";
 
                     var digiType = reader["FDIGITYPE"]?.ToString();
 
-                    if (digiType == "CH") chList.Add(scheme);
+                    if (digiType == "WT" || digiType == "AT") chList.Add(scheme);
                     else if (digiType == "DG" && scheme.fdigicr == "22K") dg22kList.Add(scheme);
                     else if (digiType == "DG" && scheme.fdigicr == "24K") dg24kList.Add(scheme);
                     else if (digiType == "DS") silverList.Add(scheme);
@@ -686,7 +823,7 @@ WHERE rn = 1;";
             SELECT 
                 FORMAT(CAST(L.FDATE AS DATE), 'dd/MM/yyyy') AS FDATE,
                 L.FVRAMOUNT,
-                L.FWT
+                B.FWT
             FROM LEDGER L
             JOIN PARTY P ON P.FID = L.FID
             JOIN BLEDGER B ON B.FVOUCHNO = L.FVRNO 
