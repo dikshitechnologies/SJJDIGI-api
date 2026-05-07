@@ -29,74 +29,41 @@ namespace CHITSCHEME.Controllers
         [HttpPost("create-order")]
         public IActionResult CreateOrder([FromBody] valAmount amt)
         {
-            try
+            if (amt == null || string.IsNullOrWhiteSpace(amt.Amount))
+                return BadRequest(new { message = "Amount is required" });
+
+            if (!decimal.TryParse(amt.Amount, System.Globalization.NumberStyles.Any,
+                                  System.Globalization.CultureInfo.InvariantCulture,
+                                  out decimal amountValue))
+                return BadRequest(new { message = "Invalid amount format" });
+
+            if (amountValue <= 0)
+                return BadRequest(new { message = "Amount must be greater than 0" });
+
+            string keyId = _config["Razorpay:KeyId"];
+            string keySecret = _config["Razorpay:KeySecret"];
+
+            var client = new RazorpayClient(keyId, keySecret);
+
+            var amountInPaise = (int)decimal.Round(amountValue * 100m, 0, MidpointRounding.AwayFromZero);
+
+            var options = new Dictionary<string, object>
             {
-                if (amt == null || string.IsNullOrWhiteSpace(amt.Amount))
-                    return BadRequest(new { message = "Amount is required" });
+                { "amount", amountInPaise },
+                { "currency", "INR" }
+            };
 
-                // Convert string → decimal safely
-                if (!decimal.TryParse(amt.Amount, System.Globalization.NumberStyles.Any,
-                                      System.Globalization.CultureInfo.InvariantCulture,
-                                      out decimal amountValue))
-                {
-                    return BadRequest(new { message = "Invalid amount format" });
-                }
+            var order = client.Order.Create(options);
 
-                // Validation
-                if (amountValue <= 0)
-                    return BadRequest(new { message = "Amount must be greater than 0" });
-
-                // Your custom max limit
-                //decimal maxAmount = 1000000; // Example: 10 Lakhs
-                //if (amountValue > maxAmount)
-                //    return BadRequest(new { message = $"Amount cannot exceed {maxAmount} INR" });
-
-                string keyId = _config["Razorpay:KeyId"];
-                string keySecret = _config["Razorpay:KeySecret"];
-
-                var client = new Razorpay.Api.RazorpayClient(keyId, keySecret);
-
-                var options = new Dictionary<string, object>
-        {
-            { "amount", (int)(amountValue * 100) }, // amount in paise
-            { "currency", "INR" }
-        };
-
-                Razorpay.Api.Order order;
-
-                try
-                {
-                    // Razorpay call
-                    order = client.Order.Create(options);
-                }
-                catch (Razorpay.Api.Errors.BadRequestError ex)
-                {
-                    // Handles incorrect amount, currency issues, invalid key, etc.
-                    return BadRequest(new { message = "Razorpay Bad Request", error = ex.Message });
-                }
-                catch (Razorpay.Api.Errors.ServerError ex)
-                {
-                    // Handles Razorpay internal server problems
-                    return StatusCode(502, new { message = "Razorpay Server Error", error = ex.Message });
-                }
-                catch (Exception ex)
-                {
-                    // Fallback for any other unexpected Razorpay errors
-                    return StatusCode(500, new { message = "Unexpected Razorpay Error", error = ex.Message });
-                }
-
-                // If successful
-                return Ok(new
-                {
-                    orderId = order["id"].ToString(),
-                    amount = amountValue
-                });
-            }
-            catch (Exception ex)
+            return Ok(new
             {
-                return StatusCode(500, new { message = "Internal Server Error", error = ex.Message });
-            }
+                orderId = order["id"].ToString(),
+                amount = Convert.ToInt32(order["amount"]),
+                currency = order["currency"].ToString(),
+                keyId = keyId
+            });
         }
+
 
         public class VerifyPaymentRequest
         {
