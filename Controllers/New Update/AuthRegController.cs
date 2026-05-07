@@ -279,7 +279,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 var cmd = new SqlCommand(@"
             SELECT TOP 1 FCOMPCODE, FADMIN, PHONE1
             FROM COMPANY 
-            WHERE FADMIN = @username AND FSUP = @password", connection);
+            WHERE  FSUP = @username AND FADMIN = @password", connection);
 
                 cmd.Parameters.AddWithValue("@username", username);
                 cmd.Parameters.AddWithValue("@password", password);
