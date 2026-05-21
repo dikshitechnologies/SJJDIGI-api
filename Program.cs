@@ -97,11 +97,11 @@ app.UseSwaggerUI(c =>
 
     if (env == Environments.Production)
     {
-        c.SwaggerEndpoint("/DGDEMO/swagger/v1/swagger.json", "DGDEMO v1");
+        c.SwaggerEndpoint("/jjkchit/swagger/v1/swagger.json", "dgdemo v1");
     }
     else
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "DGDEMO v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "jjkchit v1");
     }
 });
 
