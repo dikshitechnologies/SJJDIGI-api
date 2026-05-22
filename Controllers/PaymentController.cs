@@ -58,7 +58,7 @@ namespace CHITSCHEME.Controllers
             return Ok(new
             {
                 orderId = order["id"].ToString(),
-                amount = Convert.ToInt32(order["amount"]),
+                amount = Convert.ToDecimal(order["amount"]) / 100,
                 currency = order["currency"].ToString(),
                 keyId = keyId
             });
