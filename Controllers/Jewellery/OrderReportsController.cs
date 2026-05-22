@@ -527,7 +527,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
                 // 🔹 DATA QUERY
                 string dataQuery = @"
-         SELECT 
+SELECT 
     p.userId,
     p.UserName,
     p.PhoneNumber,
@@ -535,6 +535,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
     b.fVouchdt,
     CASE 
         WHEN b.fpaymenttype = 'Y' THEN 'ONLINE'
+        WHEN b.fpaymenttype = 'N' THEN 'COD'
         ELSE 'COD'
     END AS PaymentType
 FROM bledger b
@@ -542,11 +543,19 @@ JOIN RegisterUsers p ON p.UserID = b.fCucode
 WHERE b.fvtype = 'od'
   AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
   AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
-  AND (@paymentFilter = '' 
-       OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
-       OR (@paymentFilter = 'COD' AND (b.fpaymenttype IS NULL OR b.fpaymenttype = '')))
-  AND (p.UserName LIKE '%' + @search + '%'
-       OR p.PhoneNumber LIKE '%' + @search + '%')
+  AND (
+        @paymentFilter = ''
+        OR (@paymentFilter = 'ONLINE' AND b.fpaymenttype = 'Y')
+        OR (@paymentFilter = 'COD' AND (
+                b.fpaymenttype = 'N'
+                OR b.fpaymenttype IS NULL
+                OR b.fpaymenttype = ''
+           ))
+      )
+  AND (
+        p.UserName LIKE '%' + @search + '%'
+        OR p.PhoneNumber LIKE '%' + @search + '%'
+      )
 ORDER BY b.fVouchdt DESC
 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
