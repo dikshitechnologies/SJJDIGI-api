@@ -16,7 +16,7 @@ namespace CHITSCHEME.Controllers.SHEME
 
        
 
-
+            
         public class PartyDto
         {
             public string FCode { get; set; }
@@ -112,19 +112,36 @@ namespace CHITSCHEME.Controllers.SHEME
         private string GetNextFcode(SqlConnection con, SqlTransaction transaction, string prefix, int flen)
         {
             string nextFcode = "";
-            string queryMaxFcode = "SELECT MAX(fid) FROM party WHERE fid LIKE @PrefixPattern";
+            string query = @"
+        SELECT MAX(fid)
+        FROM party
+        WHERE LEFT(fid, @PrefixLength) = @Prefix";
 
-            using (SqlCommand cmd = new SqlCommand(queryMaxFcode, con, transaction))
+            using (SqlCommand cmd = new SqlCommand(query, con, transaction))
             {
-                cmd.Parameters.AddWithValue("@PrefixPattern", prefix + "%");
-                var result = cmd.ExecuteScalar();
+                cmd.Parameters.AddWithValue("@PrefixLength", prefix.Length);
+                cmd.Parameters.AddWithValue("@Prefix", prefix);
+
+                object result = cmd.ExecuteScalar();
 
                 if (result != null && result != DBNull.Value)
                 {
-                    string maxFcode = result.ToString();
-                    string numberPart = maxFcode.Substring(prefix.Length);
-                    int nextNumber = int.Parse(numberPart) + 1;
-                    nextFcode = prefix + nextNumber.ToString().PadLeft(flen, '0');
+                    string maxFid = result.ToString();
+
+                    // EXACT VB6 RIGHT()
+                    string rightPart = maxFid.Length >= flen
+                        ? maxFid.Substring(maxFid.Length - flen)
+                        : maxFid;
+
+                    // EXACT VB6 VAL()
+                    int number = VBVal(rightPart);
+
+                    number = number + 1;
+
+                    // EXACT VB6 FORMAT("0000")
+                    string formatted = Math.Abs(number).ToString().PadLeft(flen, '0');
+
+                    nextFcode = prefix + formatted;
                 }
                 else
                 {
@@ -132,19 +149,34 @@ namespace CHITSCHEME.Controllers.SHEME
                 }
             }
 
-            // Check if max limit reached
-            string maxPossibleCode = prefix + new string('9', flen);
-            if (string.Compare(nextFcode, maxPossibleCode) > 0)
-            {
-                return "LIMIT_REACHED";
-            }
-
             return nextFcode;
         }
 
+        private int VBVal(string input)
+        {
+            input = input.Trim();
 
+            string valid = "";
+            bool started = false;
 
+            foreach (char c in input)
+            {
+                if (char.IsDigit(c) || (c == '-' && !started))
+                {
+                    valid += c;
+                    started = true;
+                }
+                else if (started)
+                {
+                    break;
+                }
+            }
 
+            if (int.TryParse(valid, out int result))
+                return result;
+
+            return 0;
+        }
 
 
 
@@ -220,7 +252,6 @@ namespace CHITSCHEME.Controllers.SHEME
                 // ------------------ Determine digiType and fschemetype ------------------
                 string digiTypeValue = ""; // DG / DS / empty
                 string fschemetypeValue = customer.fschemetype ?? "";
-
                 if (!string.IsNullOrEmpty(customer.digiType))
                 {
                     string digiUpper = customer.digiType.ToUpper();
@@ -290,7 +321,7 @@ namespace CHITSCHEME.Controllers.SHEME
 
                     await cmd.ExecuteNonQueryAsync();
                 }
-
+             
                 transaction.Commit();
 
                 return Ok(new

@@ -43,7 +43,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
                 JOIN ITEM I ON I.fItemcode = IT.fItemcode 
                 WHERE B.fCucode = @CustomerCode 
-                AND B.fvType = 'OD' 
+                AND B.fvType = 'OS' 
                 AND B.FORDERSTATUS = 'N'";
 
                     using (SqlCommand cmd = new SqlCommand(query, con))
@@ -107,7 +107,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 JOIN ItemPurchaseOP IP ON IP.fID = IT.FproductID
                 JOIN ITEM I ON I.fItemcode = IT.fItemcode 
                 WHERE B.fCucode = @CustomerCode 
-                AND B.fvType = 'OD' 
+                AND B.fvType = 'OS' 
                 AND B.FORDERSTATUS = 'Y'";
 
                     using (SqlCommand cmd = new SqlCommand(query, con))
@@ -186,7 +186,7 @@ JOIN
 JOIN 
     ITEM I ON I.fItemcode = IT.fItemcode 
 WHERE 
-    B.fvType = 'OD' 
+    B.fvType = 'OS' 
     AND B.FORDERSTATUS = 'N'
 
     AND (
@@ -296,7 +296,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
  JOIN 
      ITEM I ON I.fItemcode = IT.fItemcode 
  WHERE 
-     B.fvType = 'OD' 
+     B.fvType = 'OS' 
      AND B.FORDERSTATUS = 'Y'
 
      AND (
@@ -506,7 +506,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
         SELECT COUNT(*)
   FROM bledger b
   JOIN RegisterUsers p ON p.UserID = b.fCucode
-  WHERE b.fvtype = 'od'
+  WHERE b.fvtype = 'OS'
     AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
     AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
     AND (@paymentFilter = '' 
@@ -540,7 +540,7 @@ SELECT
     END AS PaymentType
 FROM bledger b
 JOIN RegisterUsers p ON p.UserID = b.fCucode
-WHERE b.fvtype = 'od'
+WHERE b.fvtype = 'OS'
   AND (@fromDate IS NULL OR b.fVouchdt >= @fromDate)
   AND (@toDate IS NULL OR b.fVouchdt <= @toDate)
   AND (

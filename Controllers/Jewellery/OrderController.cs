@@ -10,7 +10,7 @@ namespace CHITSCHEME.Controllers.Jewellery
 {
     
     [Route("api/[controller]")]
-    [Authorize]
+    //[Authorize]
     [ApiController]
     public class OrderController : ControllerBase
     {
@@ -34,9 +34,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                         try
                         {
                             string getMaxVoucherQuery = @"
-                            SELECT MAX(fVouchno)
+                             SELECT MAX(fVouchno)
                             FROM BLEDGER
-                            WHERE fvType = 'OD'";
+                            WHERE FBILLTYPE = 'OS'";
 
                             string lastVoucher = null;
 
@@ -50,7 +50,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                             if (string.IsNullOrEmpty(lastVoucher))
                             {
                                 // First voucher
-                                formattedVoucher = "OD00001";
+                                formattedVoucher = "OS00001";
                             }
                             else
                             {
@@ -59,7 +59,7 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                                 int nextNumber = int.Parse(numberPart) + 1;
 
-                                formattedVoucher = "OD" + nextNumber.ToString("D5");
+                                formattedVoucher = "OS" + nextNumber.ToString("D5");
                             }
 
                             double totalAmount = 0;
@@ -123,7 +123,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     {
                                         cmdInsert.Parameters.AddWithValue("@FVOUCHER", formattedVoucher);
                                         cmdInsert.Parameters.AddWithValue("@FItemcode", row["Itemcode"].ToString());
-                                        cmdInsert.Parameters.AddWithValue("@FTYpe", "OD");
+                                        cmdInsert.Parameters.AddWithValue("@FTYpe", "OS");
                                         cmdInsert.Parameters.AddWithValue("@fTotQty", item.Quantity);
                                         cmdInsert.Parameters.AddWithValue("@FGms", row["fGms"]);
                                         cmdInsert.Parameters.AddWithValue("@FMcAmount", row["fMcAmount"]);
@@ -147,7 +147,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                             // 4. Insert summary into BLEDGER
                             string insertBledgerQuery = @"
                             INSERT INTO BLEDGER (fCucode, fvtype, FVOUCHNO, FBILLAMT, FBILLTYPE, FVOUCHDT,FORDERSTATUS,FPAYMENTTYPE)
-                            VALUES (@CustomerCode, 'OD', @FVOUCHER, @FBILLAMOUNT, 'OD', GETDATE(),@FORDERSTATUS,@FPAYMENTTYPE)";
+                            VALUES (@CustomerCode, 'OS', @FVOUCHER, @FBILLAMOUNT, 'OS', GETDATE(),@FORDERSTATUS,@FPAYMENTTYPE)";
 
                             using (SqlCommand cmdBledger = new SqlCommand(insertBledgerQuery, con, tran))
                             {

@@ -15,7 +15,7 @@ using System.Reflection.PortableExecutable;
 namespace CHITSCHEME.Controllers
 {
     [Route("api/[controller]")]
-    [Authorize] 
+    //[Authorize] 
     [ApiController]
     public class SchemeDetailsController : ControllerBase
     {
@@ -358,19 +358,18 @@ WITH RankedSchemes AS (
         ) AS rn,
 
         -- Current month paid (only ONLINE payments)
-       CASE
+      CASE
     WHEN EXISTS(
         SELECT 1
         FROM LEDGER L3
-        JOIN BLEDGER B3 
+        INNER JOIN BLEDGER B3
             ON B3.FVOUCHNO = L3.FVRNO
         WHERE
             L3.FID = P.FID
-            AND L3.FDATE >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
-            AND L3.FDATE < DATEADD(MONTH, 1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+            AND MONTH(L3.FDATE) = MONTH(GETDATE())
+            AND YEAR(L3.FDATE) = YEAR(GETDATE())
             AND L3.fCrDb = 'CR'
             AND L3.FTYPE = 'CT'
-            AND ISNULL(B3.FONLINE, 'Y') = 'Y'
     ) THEN 'Y'
     ELSE 'N'
 END AS IS_CURRENT_MONTH_PAID
@@ -689,7 +688,7 @@ WHERE rn = 1;
 
                     var digiType = reader["FDIGITYPE"]?.ToString();
 
-                    if (digiType == "WT" || digiType == "AT") chList.Add(scheme);
+                    if (digiType == "WT" || digiType == "AT" || digiType == "CH") chList.Add(scheme);
                     else if (digiType == "DG" && scheme.fdigicr == "22K") dg22kList.Add(scheme);
                     else if (digiType == "DG" && scheme.fdigicr == "24K") dg24kList.Add(scheme);
                     else if (digiType == "DS") silverList.Add(scheme);
@@ -1149,7 +1148,7 @@ WHERE rn = 1;
 
         [HttpGet("DigiList")]
         public IActionResult GetSchemes(
-       [FromQuery] string parentCode = "000010004400069", // default value
+       [FromQuery] string parentCode = "000010004400068", // default value
        [FromQuery] int pageNumber = 1,
        [FromQuery] int pageSize = 10,
        [FromQuery] string searchTerm = "")
@@ -1424,7 +1423,7 @@ SELECT
     P.FACNAME,
     P.FPHONE,
     P.FID,
-    ISNULL(NULLIF(B.FPAYMENTTYPE,''),'N') AS PAYMENTTYPE
+    ISNULL(NULLIF(B.FONLINE,''),'N') AS PAYMENTTYPE
 FROM LEDGER L
 JOIN PARTY P ON P.FID = L.FID
 LEFT JOIN BLEDGER B ON B.FVOUCHNO = L.FVRNO
