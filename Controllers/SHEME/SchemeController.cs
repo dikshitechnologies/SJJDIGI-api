@@ -47,7 +47,7 @@ namespace CHITSCHEME.Controllers.SHEME
                     string query = @"
                         SELECT fcode, facName, fParent,fdue,FAMOUNT,FSCHEMETYPE
                         FROM party
-                        WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2 
+                        WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2 AND FSHOW = '1'
                         ORDER BY fParent, fcode";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
