@@ -20,5 +20,12 @@ namespace CHITSCHEME.Models
         [JsonPropertyName("weight")]
         public string Weight { get; set; }
 
+        public string fbwt { get; set; }
+        public string fbamt { get; set; }
+        public string fbfinalamt { get; set; }
+        public string finalwt { get; set; }
+        public string FGRATE { get; set; }
+
+
     }
 }

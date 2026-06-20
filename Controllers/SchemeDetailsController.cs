@@ -336,7 +336,7 @@ WITH RankedSchemes AS (
         P.FDIGITYPE,
         P.FID AS SCHEMECODE,
         P.FSCHEMETYPE,
-
+        P.fdate,
         -- Paid Due (based on latest online payment)
         CASE 
             WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 
@@ -681,8 +681,9 @@ WHERE rn = 1;
                         fdigicr = reader["FDIGICR"]?.ToString(),
                         FSCHEMETYPE = reader["FSCHEMETYPE"] == DBNull.Value ||string.IsNullOrWhiteSpace(reader["FSCHEMETYPE"].ToString())? "R": reader["FSCHEMETYPE"].ToString(),
                          fcompcode = reader["FCOMPCODE"]?.ToString(),
-                        weight = weight > 0 ? weight.ToString("0.000") : null
-
+                        weight = weight > 0 ? weight.ToString("0.000") : null,
+                         joinDate = reader["FDATE"] != DBNull.Value
+                        ? Convert.ToDateTime(reader["FDATE"]).ToString("dd/MM/yyyy") : ""
 
                     };
 
@@ -1065,7 +1066,7 @@ WHERE rn = 1;
                     cmd.Parameters.AddWithValue("@FSMSSALES", "N");
                     cmd.Parameters.AddWithValue("@FSMSCHIT", "N");
                     cmd.Parameters.AddWithValue("@FINT", "0");
-                    cmd.Parameters.AddWithValue("@fwt", item.Weight ?? (object)DBNull.Value);
+                   
                     cmd.Parameters.AddWithValue("@FRATE", item.Amount);
                     cmd.Parameters.AddWithValue("@FCARD", "0");
                     cmd.Parameters.AddWithValue("@FUPI", item.Amount);
@@ -1079,6 +1080,16 @@ WHERE rn = 1;
                     cmd.Parameters.AddWithValue("@FCHQCODE", "");
                     cmd.Parameters.AddWithValue("@FUPICODE", "00068");
                     cmd.Parameters.AddWithValue("@FORDERSTATUS", "Y");
+
+
+
+                    cmd.Parameters.AddWithValue("@fwt", item.finalwt ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FACTWT", item.Weight ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FBWT", item.fbwt ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FBAMT", item.fbamt ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FFINALBAMT", item.fbfinalamt ?? (object)DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FGRATE", item.FGRATE ?? (object)DBNull.Value);
+
                     cmd.ExecuteNonQuery();
                 }
             }
