@@ -73,8 +73,8 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 string maxRegisterIdQuery = "SELECT MAX(UserID) FROM RegisterUsers";
             string insertQuery = @"
-        INSERT INTO RegisterUsers (UserID,UserName, Email, PhoneNumber, PasswordHash,CreatedAt)
-        VALUES (@UserID,@UserName, @Email, @PhoneNumber, @PasswordHash,@CreatedAt);";
+        INSERT INTO RegisterUsers (UserID,UserName, Email, PhoneNumber, PasswordHash,CreatedAt, FcmToken, DeviceType, LastLogin)
+        VALUES (@UserID,@UserName, @Email, @PhoneNumber, @PasswordHash,@CreatedAt, @FcmToken, @DeviceType, @LastLogin);";
 
             using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
             {
@@ -122,7 +122,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                             cmd.Parameters.AddWithValue("@PhoneNumber", model.Phonenumber);
                             cmd.Parameters.AddWithValue("@PasswordHash", "");
                             cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
-
+                            cmd.Parameters.AddWithValue("@FcmToken", (object)model.FcmToken ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@DeviceType", (object)model.DeviceType ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
                             int rowsAffected = await cmd.ExecuteNonQueryAsync();
 
                             if (rowsAffected > 0)

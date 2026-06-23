@@ -13,6 +13,12 @@ namespace CHITSCHEME.Models
         [JsonProperty("Phonenumber")]
         public string Phonenumber { get; set; }
 
+        [JsonProperty("FcmToken")]
+        public string FcmToken { get; set; }
+
+        [JsonProperty("DeviceType")]
+        public string DeviceType { get; set; }
+
     }
        
 }

@@ -379,4 +379,7 @@ namespace CHITSCHEME.Controllers
 public class LoginRequest
 {
     public string Phone { get; set; }
+    public string FcmToken { get; set; }
+    public string DeviceType { get; set; }
+
 }
