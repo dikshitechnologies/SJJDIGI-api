@@ -105,8 +105,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                         userId = (int)await getMaxIdCmd.ExecuteScalarAsync();
 
                         var insertCmd = new SqlCommand(@"
-                    INSERT INTO RegisterUsers (UserId, UserName, PhoneNumber, Email, PasswordHash, CreatedAt)
-                    VALUES (@UserId, @UserName, @PhoneNumber, @Email, @PasswordHash, @CreatedAt)",
+                   INSERT INTO RegisterUsers (UserId, UserName, PhoneNumber, Email, PasswordHash, CreatedAt, FcmToken, DeviceType, LastLogin)
+                    VALUES (@UserId, @UserName, @PhoneNumber, @Email, @PasswordHash, @CreatedAt, @FcmToken, @DeviceType, @LastLogin)",
                             connection, transaction);
 
                         insertCmd.Parameters.AddWithValue("@UserId", userId);
@@ -115,7 +115,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                         insertCmd.Parameters.AddWithValue("@Email", "");
                         insertCmd.Parameters.AddWithValue("@PasswordHash", "");
                         insertCmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
-
+                        insertCmd.Parameters.AddWithValue("@FcmToken", (object)request.FcmToken ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
                         await insertCmd.ExecuteNonQueryAsync();
                         await transaction.CommitAsync();
                         if (userId !=0 && !string.IsNullOrEmpty(partyPhone))
@@ -177,6 +179,16 @@ namespace CHITSCHEME.Controllers.Jewellery
                 // -------- If party exists and already registered --------
                 if (partyName != null && partyPhone != null && userId > 0)
                 {
+                    var updateCmd = new SqlCommand(@"
+                        UPDATE RegisterUsers 
+                        SET FcmToken = @FcmToken, DeviceType = @DeviceType, LastLogin = @LastLogin
+                        WHERE UserId = @UserId", connection);
+                    updateCmd.Parameters.AddWithValue("@FcmToken", (object)request.FcmToken ?? DBNull.Value);
+                    updateCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
+                    updateCmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
+                    updateCmd.Parameters.AddWithValue("@UserId", userId);
+                    await updateCmd.ExecuteNonQueryAsync();
+
                     var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
                     return Ok(new { token, UserPermission = "U", UserId = userId, username, email, phone = partyPhone, responseDivisions });
                 }
@@ -184,6 +196,16 @@ namespace CHITSCHEME.Controllers.Jewellery
                 // -------- If party does not exist but user is registered --------
                 if (partyName == null && userId > 0)
                 {
+                    var updateCmd = new SqlCommand(@"
+                        UPDATE RegisterUsers 
+                        SET FcmToken = @FcmToken, DeviceType = @DeviceType, LastLogin = @LastLogin
+                        WHERE UserId = @UserId", connection);
+                    updateCmd.Parameters.AddWithValue("@FcmToken", (object)request.FcmToken ?? DBNull.Value);
+                    updateCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
+                    updateCmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
+                    updateCmd.Parameters.AddWithValue("@UserId", userId);
+                    await updateCmd.ExecuteNonQueryAsync();
+
                     var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
                     return Ok(new { token, UserPermission = "U", UserId = userId, username, email , phone = partyPhone, responseDivisions });
                 }
