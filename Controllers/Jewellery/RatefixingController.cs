@@ -65,14 +65,16 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 if (tokens.Count == 0) return;
 
-                string title = "Today's Rates!";
-                string body  = $"Gold 22K - ₹{goldRate} per gram\nSilver - ₹{silverRate} per gram";
+                string title    = "Today's Rates!";
+                string body     = $"Gold 22K - ₹{goldRate} per gram\nSilver - ₹{silverRate} per gram";
+                string imageUrl = "https://app.dikshitech.com/pukhrajchit/NotifyImg/Pukhraj.png";
 
                 var dataPayload = new Dictionary<string, string>
                 {
                     { "click_action", "FLUTTER_NOTIFICATION_CLICK" },
-                    { "gold_rate",   goldRate   },
-                    { "silver_rate", silverRate }
+                    { "gold_rate",    goldRate    },
+                    { "silver_rate",  silverRate  },
+                    { "image_url",    imageUrl    }
                 };
 
                 const int batchSize = 500;
@@ -86,16 +88,17 @@ namespace CHITSCHEME.Controllers.Jewellery
                     var multicast = new MulticastMessage
                     {
                         Tokens = batch,
-                        Notification = new Notification { Title = title, Body = body },
+                        Notification = new Notification { Title = title, Body = body, ImageUrl = imageUrl },
                         Data = dataPayload,
                         Android = new AndroidConfig
                         {
                             Priority = Priority.High,
                             Notification = new AndroidNotification
                             {
-                                Title = title,
-                                Body  = body,
-                                Sound = "default",
+                                Title     = title,
+                                Body      = body,
+                                ImageUrl  = imageUrl,
+                                Sound     = "default",
                                 ChannelId = "general"
                             }
                         },
@@ -135,7 +138,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     insertLog.Parameters.AddWithValue("@NotificationId", Guid.NewGuid().ToString());
                     insertLog.Parameters.AddWithValue("@Title",          title);
                     insertLog.Parameters.AddWithValue("@Body",           body);
-                    insertLog.Parameters.AddWithValue("@ImageUrl",       DBNull.Value);
+                    insertLog.Parameters.AddWithValue("@ImageUrl", imageUrl);
                     insertLog.Parameters.AddWithValue("@SentAt",         DateTime.Now);
                     insertLog.Parameters.AddWithValue("@TotalDevices",   tokens.Count.ToString());
                     insertLog.Parameters.AddWithValue("@SuccessCount",   (tokens.Count - failedTokens.Count).ToString());

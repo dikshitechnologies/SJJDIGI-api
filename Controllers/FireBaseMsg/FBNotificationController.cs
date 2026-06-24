@@ -27,10 +27,13 @@ namespace CHITSCHEME.Controllers.FireBaseMsg
                 var jsonPath = Path.Combine(AppContext.BaseDirectory,
                     "pukhraj-chit-firebase-adminsdk-fbsvc-b739f8988d.json");
 
-                FirebaseApp.Create(new AppOptions
+                if (FirebaseApp.DefaultInstance == null)
                 {
-                    Credential = GoogleCredential.FromFile(jsonPath)
-                });
+                    FirebaseApp.Create(new AppOptions
+                    {
+                        Credential = GoogleCredential.FromFile(jsonPath)
+                    });
+                }
 
                 _firebaseInitialized = true;
             }
@@ -88,7 +91,7 @@ namespace CHITSCHEME.Controllers.FireBaseMsg
                     using (var stream = new FileStream(fullPath, FileMode.Create))
                         await image.CopyToAsync(stream);
 
-                    imageUrl = $"{Request.Scheme}://{Request.Host}/notification/{fileName}";
+                    imageUrl = $"https://app.dikshitech.com/pukhrajchit/notification/{fileName}";
                 }
 
                 // ── 2. Fetch all valid FCM tokens ────────────────────────────────
