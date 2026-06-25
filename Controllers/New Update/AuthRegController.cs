@@ -26,22 +26,13 @@ namespace CHITSCHEME.Controllers.Jewellery
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Phone))
-                return BadRequest(new { message = "Phone number is required." });
+                return BadRequest(new { success = false, message = "Phone number is required." });
 
             if (request.Phone.Length != 10)
-                return BadRequest(new { message = "Phone number must be 10 digits." });
+                return BadRequest(new { success = false, message = "Phone number must be 10 digits." });
 
             if (!IsPhoneNumberValid(request.Phone))
-                return BadRequest(new { message = "Invalid phone number format." });
-
-            var responseDivisions = new
-            {
-                divisions = new
-                {
-                    gold = new List<object>(),
-                    silver = new List<object>()
-                }
-            };
+                return BadRequest(new { success = false, message = "Invalid phone number format." });
 
             try
             {
@@ -54,12 +45,12 @@ namespace CHITSCHEME.Controllers.Jewellery
                 string partyPhone = null;
 
                 var partyCmd = new SqlCommand(@"
-            SELECT TOP 1 FACNAME, FPHONE 
-            FROM Party 
-            WHERE faclevel < 0 
-              AND fparent LIKE '0000100044%' 
-              AND fphone = @phone
-            ORDER BY FCODE", connection);
+                    SELECT TOP 1 FACNAME, FPHONE 
+                    FROM Party 
+                    WHERE faclevel < 0 
+                      AND fparent LIKE '0000100044%' 
+                      AND fphone = @phone
+                    ORDER BY FCODE", connection);
                 partyCmd.Parameters.AddWithValue("@phone", request.Phone);
 
                 using (var reader = await partyCmd.ExecuteReaderAsync())
@@ -73,12 +64,14 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 // -------- Check RegisterUsers --------
                 string username = string.Empty;
-                string email = string.Empty;
                 int userId = 0;
+                bool isMPINEnabled = false;
+                string deviceId = null;
 
-                var regDetailsCmd = new SqlCommand(
-                    "SELECT UserId, UserName, Email,PhoneNumber FROM RegisterUsers WHERE PhoneNumber = @phone",
-                    connection);
+                var regDetailsCmd = new SqlCommand(@"
+                    SELECT UserId, UserName, PhoneNumber, IsMPINEnabled, DeviceId 
+                    FROM RegisterUsers 
+                    WHERE PhoneNumber = @phone", connection);
                 regDetailsCmd.Parameters.AddWithValue("@phone", request.Phone);
 
                 using (var reader = await regDetailsCmd.ExecuteReaderAsync())
@@ -87,8 +80,9 @@ namespace CHITSCHEME.Controllers.Jewellery
                     {
                         userId = Convert.ToInt32(reader["UserId"]);
                         username = reader["UserName"].ToString();
-                        email = reader["Email"].ToString();
                         partyPhone = reader["PhoneNumber"].ToString();
+                        isMPINEnabled = reader["IsMPINEnabled"] != DBNull.Value && Convert.ToBoolean(reader["IsMPINEnabled"]);
+                        deviceId = reader["DeviceId"]?.ToString();
                     }
                 }
 
@@ -105,8 +99,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                         userId = (int)await getMaxIdCmd.ExecuteScalarAsync();
 
                         var insertCmd = new SqlCommand(@"
-                   INSERT INTO RegisterUsers (UserId, UserName, PhoneNumber, Email, PasswordHash, CreatedAt, FcmToken, DeviceType, LastLogin)
-                    VALUES (@UserId, @UserName, @PhoneNumber, @Email, @PasswordHash, @CreatedAt, @FcmToken, @DeviceType, @LastLogin)",
+                            INSERT INTO RegisterUsers (UserId, UserName, PhoneNumber, Email, PasswordHash, CreatedAt, FcmToken, DeviceType, LastLogin, IsMPINEnabled)
+                            VALUES (@UserId, @UserName, @PhoneNumber, @Email, @PasswordHash, @CreatedAt, @FcmToken, @DeviceType, @LastLogin, 0)",
                             connection, transaction);
 
                         insertCmd.Parameters.AddWithValue("@UserId", userId);
@@ -118,108 +112,121 @@ namespace CHITSCHEME.Controllers.Jewellery
                         insertCmd.Parameters.AddWithValue("@FcmToken", (object)request.FcmToken ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
+                        
                         await insertCmd.ExecuteNonQueryAsync();
                         await transaction.CommitAsync();
-                        if (userId !=0 && !string.IsNullOrEmpty(partyPhone))
+
+                        // New user - need to verify OTP and create MPIN
+                        return Ok(new
                         {
-
-
-                            // Fetch Division Data
-                            var divisionCmd = new SqlCommand(
-                                @"SELECT fCode, fName, fRate 
-                                FROM Division 
-                               WHERE fCode IN ('0003','0002','0014','0004','0005')",
-                                connection);
-
-                            using (var reader = await divisionCmd.ExecuteReaderAsync())
-                            {
-                                while (await reader.ReadAsync())
-                                {
-                                    string code = reader["fCode"].ToString();
-                                    string name = reader["fName"].ToString();
-                                    decimal rate = Convert.ToDecimal(reader["fRate"]);
-                                    if (code == "0002")
-                                    {
-                                        responseDivisions.divisions.gold.Add(new
-                                        {
-                                            name = "22K",
-                                            rate
-                                        });
-                                    }
-
-                                    // SILVER
-                                    if (code == "0005")
-                                    {
-                                        responseDivisions.divisions.silver.Add(new
-                                        {
-                                            name = "SILVER",
-                                            rate
-                                        });
-                                    }
-                                }
-                            }
-
-
-                        }
-
-
+                            success = true,
+                            userId = userId,
+                            username = partyName,
+                            phone = partyPhone,
+                            isMPINEnabled = false,
+                            deviceMatched = false,
+                            nextStep = "VERIFY_OTP"
+                        });
                     }
                     catch
                     {
                         await transaction.RollbackAsync();
                         throw;
                     }
-
-
-
-                    var tokenNew = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token = tokenNew, UserPermission = "U", UserId = userId, username = partyName, email = "" , phone = partyPhone, responseDivisions });
                 }
 
                 // -------- If party exists and already registered --------
                 if (partyName != null && partyPhone != null && userId > 0)
                 {
+                    bool deviceMatched = string.IsNullOrEmpty(deviceId) || deviceId == request.DeviceId;
+
+                    // Update FCM token and device type
                     var updateCmd = new SqlCommand(@"
                         UPDATE RegisterUsers 
-                        SET FcmToken = @FcmToken, DeviceType = @DeviceType, LastLogin = @LastLogin
+                        SET FcmToken = @FcmToken, DeviceType = @DeviceType
                         WHERE UserId = @UserId", connection);
                     updateCmd.Parameters.AddWithValue("@FcmToken", (object)request.FcmToken ?? DBNull.Value);
                     updateCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
-                    updateCmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
                     updateCmd.Parameters.AddWithValue("@UserId", userId);
                     await updateCmd.ExecuteNonQueryAsync();
 
-                    var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "U", UserId = userId, username, email, phone = partyPhone, responseDivisions });
+                    // Determine next step based on MPIN and device status
+                    string nextStep;
+                    if (!isMPINEnabled)
+                    {
+                        nextStep = "VERIFY_OTP"; // Need to verify OTP before creating MPIN
+                    }
+                    else if (!deviceMatched)
+                    {
+                        nextStep = "VERIFY_OTP"; // New device - need OTP verification
+                    }
+                    else
+                    {
+                        nextStep = "ENTER_MPIN"; // All good - just enter MPIN
+                    }
+
+                    return Ok(new
+                    {
+                        success = true,
+                        userId = userId,
+                        username = username,
+                        phone = partyPhone,
+                        isMPINEnabled = isMPINEnabled,
+                        deviceMatched = deviceMatched,
+                        nextStep = nextStep
+                    });
                 }
 
                 // -------- If party does not exist but user is registered --------
                 if (partyName == null && userId > 0)
                 {
+                    bool deviceMatched = string.IsNullOrEmpty(deviceId) || deviceId == request.DeviceId;
+
                     var updateCmd = new SqlCommand(@"
                         UPDATE RegisterUsers 
-                        SET FcmToken = @FcmToken, DeviceType = @DeviceType, LastLogin = @LastLogin
+                        SET FcmToken = @FcmToken, DeviceType = @DeviceType
                         WHERE UserId = @UserId", connection);
                     updateCmd.Parameters.AddWithValue("@FcmToken", (object)request.FcmToken ?? DBNull.Value);
                     updateCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
-                    updateCmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
                     updateCmd.Parameters.AddWithValue("@UserId", userId);
                     await updateCmd.ExecuteNonQueryAsync();
 
-                    var token = JwtHelper.GenerateJwtToken(request.Phone, "User", _config);
-                    return Ok(new { token, UserPermission = "U", UserId = userId, username, email , phone = partyPhone, responseDivisions });
+                    string nextStep;
+                    if (!isMPINEnabled)
+                    {
+                        nextStep = "VERIFY_OTP";
+                    }
+                    else if (!deviceMatched)
+                    {
+                        nextStep = "VERIFY_OTP";
+                    }
+                    else
+                    {
+                        nextStep = "ENTER_MPIN";
+                    }
+
+                    return Ok(new
+                    {
+                        success = true,
+                        userId = userId,
+                        username = username,
+                        phone = partyPhone,
+                        isMPINEnabled = isMPINEnabled,
+                        deviceMatched = deviceMatched,
+                        nextStep = nextStep
+                    });
                 }
 
                 // -------- Otherwise --------
-                return Unauthorized(new { message = "Please check the phone number." });
+                return Unauthorized(new { success = false, message = "Please check the phone number." });
             }
             catch (SqlException)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Database error. Please try again later." });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = "Database error. Please try again later." });
             }
             catch (Exception)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unexpected error occurred. Please try again later." });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = "An unexpected error occurred. Please try again later." });
             }
         }
 
