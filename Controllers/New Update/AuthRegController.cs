@@ -116,6 +116,14 @@ namespace CHITSCHEME.Controllers.Jewellery
                         await insertCmd.ExecuteNonQueryAsync();
                         await transaction.CommitAsync();
 
+                        // ── Upsert UserActivity for new user ────────────────
+                        var activityCmd = new SqlCommand(@"
+                            INSERT INTO UserActivity (CustomerCode, LastLogin, LastSeen, LoginCount, LastNotificationSent)
+                            VALUES (@CustomerCode, GETDATE(), GETDATE(), 1, NULL)",
+                            connection);
+                        activityCmd.Parameters.AddWithValue("@CustomerCode", partyPhone);
+                        await activityCmd.ExecuteNonQueryAsync();
+
                         // New user - need to verify OTP and create MPIN
                         return Ok(new
                         {
@@ -149,6 +157,21 @@ namespace CHITSCHEME.Controllers.Jewellery
                     updateCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
                     updateCmd.Parameters.AddWithValue("@UserId", userId);
                     await updateCmd.ExecuteNonQueryAsync();
+
+                    // ── Upsert UserActivity for existing user ────────────
+                    var uaCmd = new SqlCommand(@"
+                        IF EXISTS (SELECT 1 FROM UserActivity WHERE CustomerCode = @CustomerCode)
+                            UPDATE UserActivity
+                               SET LastLogin  = GETDATE(),
+                                   LastSeen   = GETDATE(),
+                                   LoginCount = LoginCount + 1
+                             WHERE CustomerCode = @CustomerCode
+                        ELSE
+                            INSERT INTO UserActivity (CustomerCode, LastLogin, LastSeen, LoginCount, LastNotificationSent)
+                            VALUES (@CustomerCode, GETDATE(), GETDATE(), 1, NULL)",
+                        connection);
+                    uaCmd.Parameters.AddWithValue("@CustomerCode", partyPhone);
+                    await uaCmd.ExecuteNonQueryAsync();
 
                     // Determine next step based on MPIN and device status
                     string nextStep;
@@ -190,6 +213,22 @@ namespace CHITSCHEME.Controllers.Jewellery
                     updateCmd.Parameters.AddWithValue("@DeviceType", (object)request.DeviceType ?? DBNull.Value);
                     updateCmd.Parameters.AddWithValue("@UserId", userId);
                     await updateCmd.ExecuteNonQueryAsync();
+
+                    // ── Upsert UserActivity — user registered but no scheme yet ──
+                    // partyPhone may be null here (no Party entry), use request.Phone
+                    var uaCmd2 = new SqlCommand(@"
+                        IF EXISTS (SELECT 1 FROM UserActivity WHERE CustomerCode = @CustomerCode)
+                            UPDATE UserActivity
+                               SET LastLogin  = GETDATE(),
+                                   LastSeen   = GETDATE(),
+                                   LoginCount = LoginCount + 1
+                             WHERE CustomerCode = @CustomerCode
+                        ELSE
+                            INSERT INTO UserActivity (CustomerCode, LastLogin, LastSeen, LoginCount, LastNotificationSent)
+                            VALUES (@CustomerCode, GETDATE(), GETDATE(), 1, NULL)",
+                        connection);
+                    uaCmd2.Parameters.AddWithValue("@CustomerCode", request.Phone.Trim());
+                    await uaCmd2.ExecuteNonQueryAsync();
 
                     string nextStep;
                     if (!isMPINEnabled)

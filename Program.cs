@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using CHITSCHEME.Middleware;
+using CHITSCHEME.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -7,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// ── Background notification scheduler (runs every 30 mins) ──
+builder.Services.AddHostedService<NotificationSchedulerService>();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -88,6 +93,9 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// ── Auto-update LastSeen on every authenticated API call ────
+app.UseLastSeen();
 
 
 app.UseSwagger();  

@@ -40,8 +40,8 @@ namespace CHITSCHEME.Controllers.New_Update
 
                 // Insert a placeholder first to get the identity Id, then rename the file
                 var insertCmd = new SqlCommand(@"
-                    INSERT INTO OfferImages (ImageName, IsActive, CreatedDate)
-                    VALUES (@ImageName, 1, @CreatedDate);
+                    INSERT INTO OfferImages (ImageName, IsActive, IsMainImg, CreatedDate)
+                    VALUES (@ImageName, 0, 0, @CreatedDate);
                     SELECT CAST(SCOPE_IDENTITY() AS INT);",
                     connection);
 
@@ -100,7 +100,7 @@ namespace CHITSCHEME.Controllers.New_Update
                 await connection.OpenAsync();
 
                 var cmd = new SqlCommand(@"
-                    SELECT Id, ImageName, IsActive, CreatedDate
+                    SELECT Id, ImageName, IsActive, IsMainImg, CreatedDate
                     FROM OfferImages
                     ORDER BY Id DESC",
                     connection);
@@ -113,11 +113,12 @@ namespace CHITSCHEME.Controllers.New_Update
                     int    id          = Convert.ToInt32(reader["Id"]);
                     string imageName   = reader["ImageName"].ToString();
                     bool   isActive    = Convert.ToBoolean(reader["IsActive"]);
+                    bool   isMainImg   = Convert.ToBoolean(reader["IsMainImg"]);
                     string createdDate = Convert.ToDateTime(reader["CreatedDate"])
                                                  .ToString("yyyy-MM-dd HH:mm:ss");
                     string imageUrl    = $"{Request.Scheme}://{Request.Host}/offerimg/{imageName}";
 
-                    list.Add(new { id, imageName, isActive, createdDate, imageUrl });
+                    list.Add(new { id, imageName, isActive, isMainImg, createdDate, imageUrl });
                 }
 
                 return Ok(new { success = true, data = list });
@@ -146,7 +147,7 @@ namespace CHITSCHEME.Controllers.New_Update
                 await connection.OpenAsync();
 
                 var cmd = new SqlCommand(@"
-                    SELECT Id, ImageName, IsActive, CreatedDate
+                    SELECT Id, ImageName, IsActive, IsMainImg, CreatedDate
                     FROM OfferImages
                     WHERE IsActive = 1
                     ORDER BY Id DESC",
@@ -160,11 +161,12 @@ namespace CHITSCHEME.Controllers.New_Update
                     int    id          = Convert.ToInt32(reader["Id"]);
                     string imageName   = reader["ImageName"].ToString();
                     bool   isActive    = Convert.ToBoolean(reader["IsActive"]);
+                    bool   isMainImg   = Convert.ToBoolean(reader["IsMainImg"]);
                     string createdDate = Convert.ToDateTime(reader["CreatedDate"])
                                                  .ToString("yyyy-MM-dd HH:mm:ss");
                     string imageUrl    = $"{Request.Scheme}://{Request.Host}/offerimg/{imageName}";
 
-                    list.Add(new { id, imageName, isActive, createdDate, imageUrl });
+                    list.Add(new { id, imageName, isActive, isMainImg, createdDate, imageUrl });
                 }
 
                 return Ok(new { success = true, data = list });
@@ -261,6 +263,54 @@ namespace CHITSCHEME.Controllers.New_Update
                 await deleteCmd.ExecuteNonQueryAsync();
 
                 return Ok(new { success = true, message = $"Offer image {id} deleted successfully." });
+            }
+            catch (SqlException ex)
+            {
+                return StatusCode(500, new { success = false, message = "Database error.", error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Server error.", error = ex.Message });
+            }
+        }
+        // -------------------------------------------------------
+        // PUT api/OfferImg/set-main/{id}
+        // Sets IsMainImg = 1 for the given Id and resets all
+        // other rows to IsMainImg = 0.
+        // -------------------------------------------------------
+        [HttpPut("set-main/{id}")]
+        public async Task<IActionResult> SetMainImage(int id)
+        {
+            try
+            {
+                var connectionString = DBHelper.GetConnection();
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // First verify the row exists
+                var checkCmd = new SqlCommand(
+                    "SELECT COUNT(1) FROM OfferImages WHERE Id = @Id", connection);
+                checkCmd.Parameters.AddWithValue("@Id", id);
+                int count = (int)await checkCmd.ExecuteScalarAsync();
+
+                if (count == 0)
+                    return NotFound(new { success = false, message = $"Offer image with Id {id} not found." });
+
+                // Reset all to 0, then set the chosen one to 1
+                var updateCmd = new SqlCommand(@"
+                    UPDATE OfferImages SET IsMainImg = 0;
+                    UPDATE OfferImages SET IsMainImg = 1 WHERE Id = @Id;",
+                    connection);
+                updateCmd.Parameters.AddWithValue("@Id", id);
+                await updateCmd.ExecuteNonQueryAsync();
+
+                return Ok(new
+                {
+                    success    = true,
+                    id,
+                    message    = $"Offer image {id} is now set as the main image.",
+                    isMainImg  = true
+                });
             }
             catch (SqlException ex)
             {
