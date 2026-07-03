@@ -51,8 +51,11 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                 if (string.IsNullOrEmpty(phoneNumber))
                     return NotFound(new { success = false, message = "User not found." });
 
+                // Demo account: Apple Store review number — fixed OTP, no SMS
+                bool isDemoAccount = phoneNumber == "9999999999";
+
                 // Generate 6-digit OTP
-                string otp = new Random().Next(100000, 999999).ToString();
+                string otp = isDemoAccount ? "123456" : new Random().Next(100000, 999999).ToString();
                 DateTime otpExpiry = DateTime.Now.AddMinutes(10);
 
                 // Check if an active OTP already exists for this phone
@@ -87,29 +90,33 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                     await insertOtpCmd.ExecuteNonQueryAsync();
                 }
 
-                // Send OTP via ping4sms gateway
-                // Template: Dear Customer, Your OTP for {#var#} is {#var#}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI
-                string smsMessage = Uri.EscapeDataString(
-                    $"Dear Customer, Your OTP for Pukhraj Elite Jewellers is {otp}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI");
-
-                string smsUrl = $"https://site.ping4sms.com/api/smsapi" +
-                    $"?key=6dad4e29de7c4fcf3ec27b96f44c5934" +
-                    $"&route=2" +
-                    $"&sender=DIKTEC" +
-                    $"&number={phoneNumber}" +
-                    $"&sms={smsMessage}" +
-                    $"&templateid=1607100000000385126";
-
-                using var httpClient = new System.Net.Http.HttpClient();
-                var smsResponse = await httpClient.GetAsync(smsUrl);
-
-                if (!smsResponse.IsSuccessStatusCode)
+                // Demo account: skip SMS, OTP is always 123456
+                if (!isDemoAccount)
                 {
-                    return StatusCode(StatusCodes.Status502BadGateway, new
+                    // Send OTP via ping4sms gateway
+                    // Template: Dear Customer, Your OTP for {#var#} is {#var#}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI
+                    string smsMessage = Uri.EscapeDataString(
+                        $"Dear Customer, Your OTP for Pukhraj Elite Jewellers is {otp}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI");
+
+                    string smsUrl = $"https://site.ping4sms.com/api/smsapi" +
+                        $"?key=6dad4e29de7c4fcf3ec27b96f44c5934" +
+                        $"&route=2" +
+                        $"&sender=DIKTEC" +
+                        $"&number={phoneNumber}" +
+                        $"&sms={smsMessage}" +
+                        $"&templateid=1607100000000385126";
+
+                    using var httpClient = new System.Net.Http.HttpClient();
+                    var smsResponse = await httpClient.GetAsync(smsUrl);
+
+                    if (!smsResponse.IsSuccessStatusCode)
                     {
-                        success = false,
-                        message = "Failed to send OTP via SMS. Please try again."
-                    });
+                        return StatusCode(StatusCodes.Status502BadGateway, new
+                        {
+                            success = false,
+                            message = "Failed to send OTP via SMS. Please try again."
+                        });
+                    }
                 }
 
                 return Ok(new
