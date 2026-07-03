@@ -668,6 +668,20 @@ WHERE rn = 1;
                         }
                       
                     }
+                    DateTime? joinDate = reader["FDATE"] != DBNull.Value
+                    ? Convert.ToDateTime(reader["FDATE"])
+                    : (DateTime?)null;
+
+                    DateTime? maturityDate = joinDate?.AddDays(330);
+
+                    string maturityStatus = "";
+
+                    if (maturityDate.HasValue)
+                    {
+                        maturityStatus = DateTime.Today >= maturityDate.Value
+                            ? "Active"
+                            : "Active";
+                    }
                     var scheme = new
                     {
                         fcode = reader["FCODE"]?.ToString(),
@@ -681,9 +695,13 @@ WHERE rn = 1;
                         fdigicr = reader["FDIGICR"]?.ToString(),
                         FSCHEMETYPE = reader["FSCHEMETYPE"] == DBNull.Value ||string.IsNullOrWhiteSpace(reader["FSCHEMETYPE"].ToString())? "R": reader["FSCHEMETYPE"].ToString(),
                          fcompcode = reader["FCOMPCODE"]?.ToString(),
-                        weight = weight > 0 ? weight.ToString("0.000") : null,
-                         joinDate = reader["FDATE"] != DBNull.Value
-                        ? Convert.ToDateTime(reader["FDATE"]).ToString("dd/MM/yyyy") : ""
+                        weight = weight > 0 ? weight.ToString("0.000") : null,                         
+                        joinDate = joinDate?.ToString("dd/MM/yyyy") ?? "",
+                        maturityDate = maturityDate?.ToString("dd/MM/yyyy") ?? "",
+                        maturityStatus = maturityStatus,
+                        daysRemaining = maturityDate.HasValue
+                        ? Math.Max(0, (maturityDate.Value.Date - DateTime.Today).Days)
+                        : 0
 
                     };
 

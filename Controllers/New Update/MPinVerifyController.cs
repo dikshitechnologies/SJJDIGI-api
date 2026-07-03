@@ -19,7 +19,7 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
         {
             _config = config;
         }
-
+       
         // ================== 2. Send OTP ==================
         [AllowAnonymous]
         [HttpPost("sendotp")]
@@ -87,13 +87,35 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                     await insertOtpCmd.ExecuteNonQueryAsync();
                 }
 
-                // TODO: Send OTP via SMS gateway
-                // For now, returning OTP in response (remove this in production)
+                // Send OTP via ping4sms gateway
+                // Template: Dear Customer, Your OTP for {#var#} is {#var#}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI
+                string smsMessage = Uri.EscapeDataString(
+                    $"Dear Customer, Your OTP for Pukhraj Elite Jewellers is {otp}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI");
+
+                string smsUrl = $"https://site.ping4sms.com/api/smsapi" +
+                    $"?key=6dad4e29de7c4fcf3ec27b96f44c5934" +
+                    $"&route=2" +
+                    $"&sender=DIKTEC" +
+                    $"&number={phoneNumber}" +
+                    $"&sms={smsMessage}" +
+                    $"&templateid=1607100000000385126";
+
+                using var httpClient = new System.Net.Http.HttpClient();
+                var smsResponse = await httpClient.GetAsync(smsUrl);
+
+                if (!smsResponse.IsSuccessStatusCode)
+                {
+                    return StatusCode(StatusCodes.Status502BadGateway, new
+                    {
+                        success = false,
+                        message = "Failed to send OTP via SMS. Please try again."
+                    });
+                }
+
                 return Ok(new
                 {
                     success = true,
-                    message = "OTP sent successfully.",
-                    otp = otp // Remove this in production!
+                    message = "OTP sent successfully."
                 });
             }
             catch (Exception ex)
