@@ -324,111 +324,110 @@ namespace CHITSCHEME.Controllers
                     }
                 }
                 var schemeQuery = @"
-WITH RankedSchemes AS (
+WITH RankedSchemes AS
+(
     SELECT
         P.FCODE,
         P.FACNAME,
         P.FPHONE,
         P.FAMOUNT,
         P.FCOMPCODE,
+        P.FDATE,
         P.FDUE,
         P.FDIGICR,
         P.FDIGITYPE,
         P.FID AS SCHEMECODE,
         P.FSCHEMETYPE,
-        P.fdate,
-        -- Paid Due (based on latest online payment)
-        CASE 
-            WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 
-            ELSE 1 
-        END AS PaidDue,
 
-        -- Due comparison
-        IIF(L.FDUE IS NULL, 'N', 
-            IIF(P.FDUE = L.FDUE, 'Y', 'N')
-        ) AS FDUE_Comparison,
+        -- Highest Due Paid (ONLINE + OFFLINE)
+        ISNULL(L.MaxDue, 0) AS PaidDue,
 
-        -- Scheme name
+        -- Due Comparison
+        CASE
+            WHEN L.MaxDue IS NULL THEN 'N'
+            WHEN P.FDUE = L.MaxDue THEN 'Y'
+            ELSE 'N'
+        END AS FDUE_Comparison,
+
+        -- Scheme Name
         PARENT.FACNAME AS SCHEMENAME,
 
-        -- Ranking
-        ROW_NUMBER() OVER(
-            PARTITION BY P.FID 
-            ORDER BY ISNULL(L.FDUE, 0) DESC
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY P.FID
+            ORDER BY ISNULL(L.MaxDue,0) DESC
         ) AS rn,
 
-        -- Current month paid (only ONLINE payments)
-      CASE
-    WHEN EXISTS(
-        SELECT 1
-        FROM LEDGER L3
-        INNER JOIN BLEDGER B3
-            ON B3.FVOUCHNO = L3.FVRNO
-        WHERE
-            L3.FID = P.FID
-            AND MONTH(L3.FDATE) = MONTH(GETDATE())
-            AND YEAR(L3.FDATE) = YEAR(GETDATE())
-            AND L3.fCrDb = 'CR'
-            AND L3.FTYPE = 'CT'
-    ) THEN 'Y'
-    ELSE 'N'
-END AS IS_CURRENT_MONTH_PAID
+        -- Current Month Paid (ONLINE + OFFLINE)
+        CASE
+            WHEN EXISTS
+            (
+                SELECT 1
+                FROM LEDGER L3
+                WHERE
+                    L3.FID = P.FID
+                    AND MONTH(L3.FDATE) = MONTH(GETDATE())
+                    AND YEAR(L3.FDATE) = YEAR(GETDATE())
+                    AND L3.FCRDB = 'CR'
+                    AND L3.FTYPE = 'CT'
+            )
+            THEN 'Y'
+            ELSE 'N'
+        END AS IS_CURRENT_MONTH_PAID
 
     FROM PARTY P
 
-    -- Latest ONLINE transaction
-    LEFT JOIN(
+    -- Highest Due Paid
+    LEFT JOIN
+    (
         SELECT
-            L1.FID,
-            L1.FVRNO,
-            L1.FDUE,
-            L1.FVRAMOUNT
-        FROM LEDGER L1
-        INNER JOIN (
-            SELECT 
-                L2.FID, 
-                MAX(L2.FVRNO) AS MaxFVRNO
-            FROM LEDGER L2
-            JOIN BLEDGER B2 
-                ON B2.FVOUCHNO = L2.FVRNO
-            WHERE 
-                L2.fCrDb = 'CR' 
-                AND L2.FTYPE = 'CT' 
-                AND B2.FONLINE = 'Y'
-            GROUP BY L2.FID
-        ) AS MaxRows 
-            ON L1.FID = MaxRows.FID 
-           AND L1.FVRNO = MaxRows.MaxFVRNO
+            FID,
+            MAX(FDUE) AS MaxDue
+        FROM LEDGER
+        WHERE
+            FCRDB = 'CR'
+            AND FTYPE = 'CT'
+        GROUP BY FID
+    ) L
+        ON P.FID = L.FID
 
-        JOIN BLEDGER B1 
-            ON B1.FVOUCHNO = L1.FVRNO 
-           AND B1.FONLINE = 'Y'
-
-        WHERE 
-            L1.fCrDb = 'CR' 
-            AND L1.FTYPE = 'CT'
-    ) L ON P.FID = L.FID
-
-    -- Parent scheme name
-    LEFT JOIN PARTY PARENT 
+    -- Parent Scheme Name
+    LEFT JOIN PARTY PARENT
         ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
 
-    -- ✅ FINAL FILTER
-    WHERE 
-        P.FPHONE = @phone 
+    WHERE
+        P.FPHONE = @phone
         AND P.FPARENT LIKE '0000100044%'
-        AND (
+        AND
+        (
             P.FSHOW = '1'
-            OR (
-                 P.FSCHEMETYPE NOT IN ('WT','AT','W')
-                 AND P.FDIGITYPE NOT IN ('DS','AT','WT')
+            OR
+            (
+                P.FSCHEMETYPE NOT IN ('WT','AT','W')
+                AND P.FDIGITYPE NOT IN ('DS','AT','WT')
             )
         )
 )
 
-SELECT *
+SELECT
+    FCODE,
+    FACNAME,
+    FPHONE,
+    FAMOUNT,
+    FCOMPCODE,
+    FDATE,
+    FDUE,
+    FDIGICR,
+    FDIGITYPE,
+    SCHEMECODE,
+    FSCHEMETYPE,
+    PaidDue,
+    FDUE_Comparison,
+    SCHEMENAME,
+    IS_CURRENT_MONTH_PAID
 FROM RankedSchemes
-WHERE rn = 1;
+WHERE rn = 1
+ORDER BY FACNAME;
 ";
 
 

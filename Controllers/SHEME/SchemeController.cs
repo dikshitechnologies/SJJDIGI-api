@@ -45,7 +45,7 @@ namespace CHITSCHEME.Controllers.SHEME
                     await conn.OpenAsync();
 
                     string query = @"
-                        SELECT fcode, facName, fParent,fdue,FAMOUNT,FSCHEMETYPE
+                        SELECT fcode, facName, fParent,fdue,FAMOUNT,fDigiType
                         FROM party
                         WHERE fParent LIKE '0000100044' + '%' AND faclevel > 2 AND FSHOW = '1'
                         ORDER BY fParent, fcode";
@@ -63,7 +63,7 @@ namespace CHITSCHEME.Controllers.SHEME
                                     FParent = reader["fParent"]?.ToString(),
                                     fdue = reader["fdue"]?.ToString(),
                                     FAMOUNT = reader["FAMOUNT"]?.ToString(),
-                                    schemeType = reader["FSCHEMETYPE"]?.ToString(),
+                                    schemeType = reader["fDigiType"]?.ToString(),
                                 });
                             }
                         }
