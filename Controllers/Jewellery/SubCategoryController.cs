@@ -110,6 +110,101 @@ namespace CHITSCHEME.Controllers.Jewellery
         }
 
 
+
+
+        [HttpPut("UpdateSubCategory")]
+        public async Task<IActionResult> UpdateSubCategory([FromForm] SubCategoryRequest model)
+        {
+            string connectionString = DBHelper.GetConnection();
+
+            using SqlConnection conn = new SqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            try
+            {
+                string imageName = null;
+
+                // Upload Image
+                if (model.Image != null && model.Image.Length > 0)
+                {
+                    string uploadFolder = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "uploads"
+                    );
+
+                    if (!Directory.Exists(uploadFolder))
+                        Directory.CreateDirectory(uploadFolder);
+
+                    string extension = Path.GetExtension(model.Image.FileName);
+
+                    imageName = $"S_{model.FCode}{extension}";
+
+                    string filePath = Path.Combine(uploadFolder, imageName);
+
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await model.Image.CopyToAsync(stream);
+                }
+
+                string query;
+
+                if (!string.IsNullOrWhiteSpace(imageName))
+                {
+                    query = @"
+                UPDATE Item
+                SET
+                    fImage = @Image,
+                    Flag   = @Flag
+                WHERE fItemCode = @Code";
+                }
+                else
+                {
+                    query = @"
+                UPDATE Item
+                SET
+                    Flag = @Flag
+                WHERE fItemCode = @Code";
+                }
+
+                using SqlCommand cmd = new SqlCommand(query, conn);
+
+                cmd.Parameters.AddWithValue("@Code", model.FCode);
+                cmd.Parameters.AddWithValue("@Flag",
+                    string.IsNullOrWhiteSpace(model.ItemFlag) ? "Y" : model.ItemFlag);
+
+                if (!string.IsNullOrWhiteSpace(imageName))
+                {
+                    cmd.Parameters.AddWithValue("@Image", imageName);
+                }
+
+                int rows = await cmd.ExecuteNonQueryAsync();
+
+                if (rows == 0)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Sub Category not found."
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    image = imageName,
+                    message = "Sub Category updated successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
     }
 }
 
@@ -238,4 +333,13 @@ public class SubCategoryItem
 
     [JsonPropertyName("image")]
     public string Image { get; set; }
+}
+
+public class SubCategoryRequest
+{
+    public string FCode { get; set; }
+
+    public string ItemFlag { get; set; } = "Y";
+
+    public IFormFile? Image { get; set; }
 }

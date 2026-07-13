@@ -48,6 +48,43 @@ namespace CHITSCHEME.Controllers.Jewellery
 
             return Ok(promotions);
         }
+        [HttpGet("GetPromotionsData")]
+        public async Task<IActionResult> GetPromotionsData()
+        {
+            List<Promotion> promotions = new List<Promotion>();
+
+            string query = "SELECT FPROMONAME,FIMAGE,FREMARK,FDATE,FCODE FROM ADPROMOTION";
+
+            try
+            {
+                await using SqlConnection conn = new SqlConnection(DBHelper.GetConnection());
+                await conn.OpenAsync();
+
+                await using SqlCommand cmd = new(query, conn);
+                await using SqlDataReader reader = await cmd.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    promotions.Add(new Promotion
+                    {
+                        Name = reader["FPROMONAME"]?.ToString(),
+                        ImageUrl = reader["FIMAGE"]?.ToString(),
+                        Remark = reader["FREMARK"]?.ToString(),
+                        Date = reader["FDATE"]?.ToString(),
+                        FCODE = reader["FCODE"]?.ToString()
+
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { status = "error", message = $"Error: {ex.Message}" });
+            }
+
+            return Ok(promotions);
+        }
+
+
         //[HttpPost("PostpromotionsData")]
         //public async Task<IActionResult> SavePromotion([FromBody] Promotion promotion)
         //{
@@ -260,6 +297,9 @@ namespace CHITSCHEME.Controllers.Jewellery
             public string Name { get; set; }
             public string ImageUrl { get; set; }
             public string Remark { get; set; }
+            public string Date { get; set; }
+            public string FCODE { get; set; }
+
 
         }
     }
