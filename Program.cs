@@ -105,7 +105,7 @@ app.UseSwaggerUI(c =>
 
     if (env == Environments.Production)
     {
-        c.SwaggerEndpoint("/pukhrajchit/swagger/v1/swagger.json", "pukhrajchit v1");
+        c.SwaggerEndpoint("/JEWELLERYWEBSITE/swagger/v1/swagger.json", "JEWELLERYWEBSITE v1");
     }
     else
     {
