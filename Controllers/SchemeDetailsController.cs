@@ -762,7 +762,7 @@ ORDER BY FACNAME;
         LEFT JOIN PARTY PARENT 
             ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
         WHERE P.FPHONE = @phone 
-            AND P.FPARENT LIKE '0000100044%'"
+            AND P.FPARENT LIKE '0000100044%' and P.FSHOW = '1'"
             ;
             //0287102872
 
