@@ -13,6 +13,9 @@ builder.Services.AddEndpointsApiExplorer();
 // ── Background notification scheduler (runs every 30 mins) ──
 builder.Services.AddHostedService<NotificationSchedulerService>();
 
+// ── Promotional broadcast scheduler (runs every 45 mins, time-aware messages) ──
+builder.Services.AddHostedService<PromotionalNotificationService>();
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
