@@ -1,6 +1,9 @@
 ﻿
 using CHITSCHEME.Helpers;
 using CHITSCHEME.Models;
+using FirebaseAdmin;
+using FirebaseAdmin.Messaging;
+using Google.Apis.Auth.OAuth2;
 using JEWELLBISREACT.DBConnection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -13,6 +16,77 @@ namespace CHITSCHEME.Controllers.Jewellery
     [ApiController]
     public class RegisterPage2Controller : ControllerBase
     {
+        // ── Firebase singleton (thread-safe) ─────────────────────────────────
+        private static bool _firebaseInitialized = false;
+        private static readonly object _fbLock   = new();
+
+        private static void EnsureFirebaseInitialized()
+        {
+            if (_firebaseInitialized) return;
+            lock (_fbLock)
+            {
+                if (_firebaseInitialized) return;
+                var jsonPath = Path.Combine(AppContext.BaseDirectory,
+                    "pukhraj-chit-firebase-adminsdk-fbsvc-b739f8988d.json");
+                if (FirebaseApp.DefaultInstance == null)
+                {
+                    FirebaseApp.Create(new AppOptions
+                    {
+                        Credential = GoogleCredential.FromFile(jsonPath)
+                    });
+                }
+                _firebaseInitialized = true;
+            }
+        }
+
+        /// <summary>
+        /// Sends a welcome push notification to the newly registered user's device.
+        /// Fires and forgets — registration is not blocked if this fails.
+        /// </summary>
+        private static async Task SendWelcomeNotificationAsync(string? fcmToken, string userName)
+        {
+            if (string.IsNullOrWhiteSpace(fcmToken)) return;
+
+            try
+            {
+                EnsureFirebaseInitialized();
+
+                string title = "Welcome to Pukhraj Elite Jewellers! 🎉";
+                string body  = $"Hi {userName}! Explore our latest collections, daily gold rates, and exclusive savings schemes.";
+
+                var message = new Message
+                {
+                    Token        = fcmToken,
+                    Notification = new Notification { Title = title, Body = body },
+                    Android      = new AndroidConfig
+                    {
+                        Priority     = Priority.High,
+                        Notification = new AndroidNotification
+                        {
+                            Title     = title,
+                            Body      = body,
+                            Sound     = "default",
+                            ChannelId = "general"
+                        }
+                    },
+                    Apns = new ApnsConfig
+                    {
+                        Aps = new Aps { Sound = "default", Badge = 1 }
+                    },
+                    Data = new Dictionary<string, string>
+                    {
+                        { "click_action", "FLUTTER_NOTIFICATION_CLICK" },
+                        { "type",         "welcome" }
+                    }
+                };
+
+                await FirebaseMessaging.DefaultInstance.SendAsync(message);
+            }
+            catch
+            {
+                // Welcome notification failure must never break registration
+            }
+        }
 
         //---------------------------------------------Duplicate Name Checking ---------------------------------
         private bool RegistruserExists(SqlConnection con, string sectionName)
@@ -129,6 +203,9 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                             if (rowsAffected > 0)
                             {
+                                // ── Fire welcome notification (non-blocking) ──
+                                _ = SendWelcomeNotificationAsync(model.FcmToken, model.Firstname);
+
                                 return Ok(new { message = "User registered successfully" });
                             }
                             else
