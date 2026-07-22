@@ -350,6 +350,8 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                 int failedAttempts = 0;
                 DateTime? lockedUntil = null;
                 string storedDeviceId = null;
+                bool fisEcatalog = false;
+
 
                 using (var reader = await userCmd.ExecuteReaderAsync())
                 {
@@ -363,6 +365,15 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                         lockedUntil = reader["MPINLockedUntil"] != DBNull.Value ? (DateTime?)reader["MPINLockedUntil"] : null;
                         storedDeviceId = reader["DeviceId"]?.ToString();
                     }
+                }
+
+                // Get Company Settings
+                var companyCmd = new SqlCommand("SELECT TOP 1 fisEcatalog FROM Company", connection);
+                var result = await companyCmd.ExecuteScalarAsync();
+
+                if (result != null && result != DBNull.Value)
+                {
+                    fisEcatalog = Convert.ToBoolean(result);
                 }
 
                 if (string.IsNullOrEmpty(mpinHash))
@@ -456,7 +467,8 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                     username = username,
                     phone = phone,
                     email = email,
-                    userId = request.UserId
+                    userId = request.UserId,
+                    fisEcatalog = fisEcatalog
                 });
             }
             catch (Exception ex)
