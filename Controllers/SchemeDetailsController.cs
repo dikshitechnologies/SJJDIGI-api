@@ -1059,9 +1059,9 @@ ORDER BY FACNAME;
             {
                 string insertBledger = @"
         INSERT INTO Bledger 
-        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS)
+        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,fCompCode)
         VALUES 
-        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS)";
+        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,'001')";
 
                 var item = schemeList[0]; // Access the first item in the list
 
@@ -1116,9 +1116,9 @@ ORDER BY FACNAME;
         {
             string insertLedger = @"
     INSERT INTO Ledger 
-    (faccode, fvrno, fType, fDate, fCrDb, fCaCb, fvrAmount, fRefcode, fCompCode, fRefNo, fid, FDUE, FPRINT, fNarration, FMOP,fwt)
+    (faccode, fvrno, fType, fDate, fCrDb, fCaCb, fvrAmount, fRefcode, fCompCode, fRefNo, fid, FDUE, FPRINT, fNarration, FMOP,fwt,fCompCode)
     VALUES 
-    (@faccode, @fvrno, @fType, @fDate, @fCrDb, @fCaCb, @fvrAmount, @fRefcode, @fCompCode, @fRefNo, @fid, @FDUE, @FPRINT, @fNarration, @FMOP,@fwt)";
+    (@faccode, @fvrno, @fType, @fDate, @fCrDb, @fCaCb, @fvrAmount, @fRefcode, @fCompCode, @fRefNo, @fid, @FDUE, @FPRINT, @fNarration, @FMOP,@fwt,'001')";
 
             if (schemeList.Count > 0)
             {

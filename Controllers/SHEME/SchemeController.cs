@@ -109,44 +109,68 @@ namespace CHITSCHEME.Controllers.SHEME
         }
 
         //------------------------------- Get the next available fcode-------------------------------
+        //private string GetNextFcode(SqlConnection con, SqlTransaction transaction, string prefix, int flen)
+        //{
+        //    string nextFcode = "";
+        //    string query = @"
+        //SELECT MAX(fid)
+        //FROM party
+        //WHERE LEFT(fid, @PrefixLength) = @Prefix";
+
+        //    using (SqlCommand cmd = new SqlCommand(query, con, transaction))
+        //    {
+        //        cmd.Parameters.AddWithValue("@PrefixLength", prefix.Length);
+        //        cmd.Parameters.AddWithValue("@Prefix", prefix);
+
+        //        object result = cmd.ExecuteScalar();
+
+        //        if (result != null && result != DBNull.Value)
+        //        {
+        //            string maxFid = result.ToString();
+
+        //            // EXACT VB6 RIGHT()
+        //            string rightPart = maxFid.Length >= flen
+        //                ? maxFid.Substring(maxFid.Length - flen)
+        //                : maxFid;
+
+        //            // EXACT VB6 VAL()
+        //            int number = VBVal(rightPart);
+
+        //            number = number + 1;
+
+        //            // EXACT VB6 FORMAT("0000")
+        //            string formatted = Math.Abs(number).ToString().PadLeft(flen, '0');
+
+        //            nextFcode = prefix + formatted;
+        //        }
+        //        else
+        //        {
+        //            nextFcode = prefix + "1".PadLeft(flen, '0');
+        //        }
+        //    }
+
+        //    return nextFcode;
+        //}
+
+
         private string GetNextFcode(SqlConnection con, SqlTransaction transaction, string prefix, int flen)
         {
             string nextFcode = "";
+
             string query = @"
-        SELECT MAX(fid)
-        FROM party
-        WHERE LEFT(fid, @PrefixLength) = @Prefix";
+    SELECT ISNULL(MAX(
+        TRY_CAST(SUBSTRING(fid, LEN(@Prefix) + 1, LEN(fid)) AS INT)
+    ),0)
+    FROM party
+    WHERE fid = @Prefix + SUBSTRING(fid, LEN(@Prefix) + 1, LEN(fid));";
 
             using (SqlCommand cmd = new SqlCommand(query, con, transaction))
             {
-                cmd.Parameters.AddWithValue("@PrefixLength", prefix.Length);
-                cmd.Parameters.AddWithValue("@Prefix", prefix);
+                cmd.Parameters.AddWithValue("@Prefix", prefix.Trim());
 
-                object result = cmd.ExecuteScalar();
+                int maxNumber = Convert.ToInt32(cmd.ExecuteScalar());
 
-                if (result != null && result != DBNull.Value)
-                {
-                    string maxFid = result.ToString();
-
-                    // EXACT VB6 RIGHT()
-                    string rightPart = maxFid.Length >= flen
-                        ? maxFid.Substring(maxFid.Length - flen)
-                        : maxFid;
-
-                    // EXACT VB6 VAL()
-                    int number = VBVal(rightPart);
-
-                    number = number + 1;
-
-                    // EXACT VB6 FORMAT("0000")
-                    string formatted = Math.Abs(number).ToString().PadLeft(flen, '0');
-
-                    nextFcode = prefix + formatted;
-                }
-                else
-                {
-                    nextFcode = prefix + "1".PadLeft(flen, '0');
-                }
+                nextFcode = prefix.Trim() + (maxNumber + 1).ToString().PadLeft(flen, '0');
             }
 
             return nextFcode;
@@ -295,9 +319,9 @@ namespace CHITSCHEME.Controllers.SHEME
                 // ------------------ Insert customer into party ------------------
                 string insertQuery = @"
             INSERT INTO party 
-            (fcode, facname, fparent, faclevel, fstreet, farea, fcity, fpincode, fphone, fmail, fdate, famount, fdue, fid,   fschemetype, FdigiType, Fdigicr,fshow)
+            (fcode, facname, fparent, faclevel, fstreet, farea, fcity, fpincode, fphone, fmail, fdate, famount, fdue, fid,   fschemetype, FdigiType, Fdigicr,fshow,fCompCode)
             VALUES 
-            (@fcode, @facname, @fparent, @faclevel, @fstreet, @farea, @fcity, @fpincode, @fphone, @fmail, @fdate, @famount, @fdue,  @fid,   @fschemetype, @digiType, @Fdigicr,'1');";
+            (@fcode, @facname, @fparent, @faclevel, @fstreet, @farea, @fcity, @fpincode, @fphone, @fmail, @fdate, @famount, @fdue,  @fid,   @fschemetype, @digiType, @Fdigicr,'1','001');";
 
                 using (SqlCommand cmd = new SqlCommand(insertQuery, con, transaction))
                 {
