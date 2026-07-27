@@ -359,21 +359,40 @@ WITH RankedSchemes AS
         ) AS rn,
 
         -- Current Month Paid (ONLINE + OFFLINE)
+       CASE
+    -- 330 Days Scheme -> Check Today's Payment
+    WHEN PARENT.fCode = '03026' THEN
         CASE
             WHEN EXISTS
             (
                 SELECT 1
                 FROM LEDGER L3
-                WHERE
-                    L3.FID = P.FID
-                    AND MONTH(L3.FDATE) = MONTH(GETDATE())
-                    AND YEAR(L3.FDATE) = YEAR(GETDATE())
-                    AND L3.FCRDB = 'CR'
-                    AND L3.FTYPE = 'CT'
+                WHERE L3.FID = P.FID
+                  AND CAST(L3.FDATE AS DATE) = CAST(GETDATE() AS DATE)
+                  AND L3.FCRDB = 'CR'
+                  AND L3.FTYPE = 'CT'
             )
             THEN 'Y'
             ELSE 'N'
-        END AS IS_CURRENT_MONTH_PAID
+        END
+
+    -- Other Schemes -> Check Current Month Payment
+    ELSE
+        CASE
+            WHEN EXISTS
+            (
+                SELECT 1
+                FROM LEDGER L3
+                WHERE L3.FID = P.FID
+                  AND MONTH(L3.FDATE) = MONTH(GETDATE())
+                  AND YEAR(L3.FDATE) = YEAR(GETDATE())
+                  AND L3.FCRDB = 'CR'
+                  AND L3.FTYPE = 'CT'
+            )
+            THEN 'Y'
+            ELSE 'N'
+        END
+END AS IS_CURRENT_MONTH_PAID
 
     FROM PARTY P
 
@@ -435,165 +454,7 @@ ORDER BY FACNAME;
 
 
 
-//var schemeQuery = @"WITH RankedSchemes AS (
-//    SELECT 
-//        P.FCODE,
-//        P.FACNAME,
-//        P.FPHONE,
-//        P.FAMOUNT,
-//        P.FCOMPCODE,
-//        P.FDUE,
-//        P.FDIGICR,
-//        P.FDIGITYPE,
-//        P.FID AS SCHEMECODE,
-//        P.FSCHEMETYPE,
 
-//        -- ✅ Correct PaidDue (COUNT of all payments)
-//        ISNULL(PD.PaidCount, 0) AS PaidDue,
-
-//        -- ✅ Due comparison
-//        CASE 
-//            WHEN PD.PaidCount IS NULL THEN 'N'
-//            WHEN P.FDUE = PD.PaidCount THEN 'Y'
-//            ELSE 'N'
-//        END AS FDUE_Comparison,
-
-//        PARENT.FACNAME AS SCHEMENAME,
-
-//        ROW_NUMBER() OVER (
-//            PARTITION BY P.FID 
-//            ORDER BY ISNULL(L.FDUE, 0) DESC
-//        ) AS rn,
-
-//        -- ✅ Current month paid check (include NULL + N)
-//        CASE 
-//            WHEN EXISTS (
-//                SELECT 1 
-//                FROM LEDGER L3
-//                LEFT JOIN BLEDGER B3 
-//                    ON B3.FVOUCHNO = L3.FVRNO
-//                WHERE 
-//                    L3.FID = P.FID 
-//                    AND L3.FDATE BETWEEN 
-//                        DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) 
-//                        AND EOMONTH(GETDATE())
-//                    AND L3.fCrDb = 'CR' 
-//                    AND L3.FTYPE = 'CT'
-//                    -- 🔥 No restriction on FONLINE
-//            ) THEN 'Y'
-//            ELSE 'N'
-//        END AS IS_CURRENT_MONTH_PAID
-
-//    FROM PARTY P
-
-//    -- ✅ Latest transaction (for display only)
-//    LEFT JOIN (
-//        SELECT 
-//            L1.FID,
-//            L1.FVRNO,
-//            L1.FDUE,
-//            L1.FVRAMOUNT
-//        FROM LEDGER L1
-//        INNER JOIN (
-//            SELECT 
-//                FID, 
-//                MAX(FVRNO) AS MaxFVRNO
-//            FROM LEDGER
-//            WHERE fCrDb = 'CR' 
-//              AND FTYPE = 'CT'
-//            GROUP BY FID
-//        ) AS MaxRows 
-//            ON L1.FID = MaxRows.FID 
-//           AND L1.FVRNO = MaxRows.MaxFVRNO
-//    ) L ON P.FID = L.FID
-
-//    -- ✅ PaidDue COUNT logic
-//    LEFT JOIN (
-//        SELECT 
-//            Lx.FID,
-//            COUNT(*) AS PaidCount
-//        FROM LEDGER Lx
-//        LEFT JOIN BLEDGER Bx 
-//            ON Bx.FVOUCHNO = Lx.FVRNO
-//        WHERE 
-//            Lx.fCrDb = 'CR'
-//            AND Lx.FTYPE = 'CT'
-//            -- 🔥 Include ALL (Y, N, NULL)
-//        GROUP BY Lx.FID
-//    ) PD ON PD.FID = P.FID
-
-//    -- ✅ Parent scheme name
-//    LEFT JOIN PARTY PARENT 
-//        ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
-
-//    WHERE 
-//        P.FPHONE = @phone
-//        AND P.FPARENT LIKE '0000100044%'
-//        AND (
-//        P.FSCHEMETYPE <> 'CH'
-//        OR (P.FDIGITYPE = 'CH' AND P.FSHOW = '1')
-//    )
-//)
-
-//SELECT *
-//FROM RankedSchemes
-//WHERE rn = 1;";
-
-
-                // ✅ 2. Fetch Schemes
-                //        var schemeQuery = @"WITH RankedSchemes AS (
-                //    SELECT 
-                //        P.FCODE,
-                //        P.FACNAME,
-                //        P.FPHONE,
-                //        P.FAMOUNT,
-                //        P.FCOMPCODE,
-                //        P.FDUE,
-                //        P.FDIGICR,
-                //        P.FDIGITYPE,
-                //        P.FID AS SCHEMECODE,
-                //        P.FSCHEMETYPE,
-                //        CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 1 ELSE 1 END AS PaidDue,
-                //        IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
-                //        PARENT.FACNAME AS SCHEMENAME,
-                //        ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
-                //        CASE 
-                //          WHEN EXISTS (
-                //            SELECT 1 
-                //            FROM LEDGER L3
-                //            JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
-                //            WHERE 
-                //              L3.FID = P.FID 
-                //               AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
-                //              AND L3.fCrDb = 'CR' 
-                //              AND L3.FTYPE = 'CT'
-                //          ) THEN 'Y'
-                //          ELSE 'N'
-                //        END AS IS_CURRENT_MONTH_PAID
-                //    FROM PARTY P
-                //    LEFT JOIN (
-                //        SELECT 
-                //            L1.FID,
-                //            L1.FVRNO,
-                //            L1.FDUE,
-                //            L1.FVRAMOUNT
-                //        FROM LEDGER L1
-                //        INNER JOIN (
-                //            SELECT FID, MAX(FVRNO) AS MaxFVRNO
-                //            FROM LEDGER L2
-                //            JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
-                //            WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
-                //            GROUP BY L2.FID
-                //        ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
-                //        JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
-                //        WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
-                //    ) L ON P.FID = L.FID
-                //    LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
-                //    WHERE P.FPHONE = @phone AND P.FPARENT LIKE '0000100044%'
-                //)
-                //SELECT *
-                //FROM RankedSchemes
-                //WHERE rn = 1;";
 
                 decimal rate22K = 0;
                 decimal rate24K = 0;
@@ -706,10 +567,25 @@ ORDER BY FACNAME;
 
                     var digiType = reader["FDIGITYPE"]?.ToString();
 
-                    if (digiType == "WT" || digiType == "AT" || digiType == "CH") chList.Add(scheme);
-                    else if (digiType == "DG" && scheme.fdigicr == "22K") dg22kList.Add(scheme);
-                    else if (digiType == "DG" && scheme.fdigicr == "24K") dg24kList.Add(scheme);
-                    else if (digiType == "DS") silverList.Add(scheme);
+                    if (string.IsNullOrWhiteSpace(digiType) ||
+                        digiType == "WT" ||
+                        digiType == "AT" ||
+                        digiType == "CH")
+                    {
+                        chList.Add(scheme);
+                    }
+                    else if (digiType == "DG" && scheme.fdigicr == "22K")
+                    {
+                        dg22kList.Add(scheme);
+                    }
+                    else if (digiType == "DG" && scheme.fdigicr == "24K")
+                    {
+                        dg24kList.Add(scheme);
+                    }
+                    else if (digiType == "DS")
+                    {
+                        silverList.Add(scheme);
+                    }
                 }
 
                 return Ok(new
