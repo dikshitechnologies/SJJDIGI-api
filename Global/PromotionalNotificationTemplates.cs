@@ -18,7 +18,7 @@ namespace CHITSCHEME.Global
         public static readonly (string Title, string Body)[] Morning =
         {
             ("Morning ☀️",          "Good morning! Your gold journey starts today."),
-            ("Wake Up! 🌞",         "Gold is waiting for you. Check today's rate."),
+            ("Wake Up! 🌞",         "தங்கம் உங்களுக்காகக் காத்திருக்கிறது. இன்றைய விலையைச் சரிபாருங்கள்."),
             ("☕ Coffee & Gold",    "Coffee first, then check today's gold rate!"),
             ("💰 New Day",          "A new day, a new opportunity to save."),
             ("📈 Gold Update",      "Did gold move overnight? Find out now."),
@@ -26,7 +26,9 @@ namespace CHITSCHEME.Global
             ("🌅 Start Small",      "Start small. Shine big. Begin your savings today."),
             ("💎 One Tap Away",     "One tap closer to your gold dream."),
             ("🔔 Daily Update",     "Your daily gold update is here."),
-            ("🎯 Don't Miss It",    "Don't miss today's opportunity.")
+            ("🎯 Don't Miss It",    "Don't miss today's opportunity."),
+            ("காலை வணக்கம்!","உங்கள் தங்கப் பயணம் இன்று தொடங்குகிறது."),
+
         };
 
         // ── Rate update messages (any time, used in afternoon slot) ─────────────
