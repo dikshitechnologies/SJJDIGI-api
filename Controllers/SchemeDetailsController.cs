@@ -935,9 +935,9 @@ ORDER BY FACNAME;
             {
                 string insertBledger = @"
         INSERT INTO Bledger 
-        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,fCompCode)
+        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,fCompCode,FACTWT,FBWT,FBAMT ,FFINALBAMT,FGRATE)
         VALUES 
-        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,'001')";
+        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,'001',@FACTWT,@FBWT,@FBAMT,@FFINALBAMT,@FGRATE)";
 
                 var item = schemeList[0]; // Access the first item in the list
 
