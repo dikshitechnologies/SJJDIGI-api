@@ -26,6 +26,8 @@ namespace CHITSCHEME.Controllers
 
                 List<object> result = new();
                 int totalRecords = 0;
+                decimal totalWeight = 0;
+                decimal totalAmount = 0;
 
                 using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
                 {
@@ -56,7 +58,6 @@ namespace CHITSCHEME.Controllers
                 OR @CustomerName=''
                 OR P.FACNAME LIKE '%' + @CustomerName + '%'
             )";
-
                     using (SqlCommand countCmd = new SqlCommand(countQuery, conn))
                     {
                         countCmd.Parameters.AddWithValue(
@@ -70,17 +71,78 @@ namespace CHITSCHEME.Controllers
                         countCmd.Parameters.AddWithValue(
                             "@CustomerCode",
                             string.IsNullOrWhiteSpace(customerCode)
-                            ? DBNull.Value
-                            : customerCode);
+                                ? DBNull.Value
+                                : customerCode);
 
                         countCmd.Parameters.AddWithValue(
                             "@CustomerName",
                             string.IsNullOrWhiteSpace(customerName)
-                            ? DBNull.Value
-                            : customerName);
+                                ? DBNull.Value
+                                : customerName);
 
-                        totalRecords = Convert.ToInt32(
-                            await countCmd.ExecuteScalarAsync());
+                        totalRecords = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
+                    }
+                    string totalQuery = @"
+SELECT
+    ISNULL(SUM(B.FWT), 0) AS TotalWeight,
+    ISNULL(SUM(B.FBILLAMT), 0) AS TotalAmount
+FROM BLEDGER B
+LEFT JOIN PARTY P
+    ON P.FCODE = B.FCUCODE
+WHERE B.fbilltype='CT'
+
+AND (
+    @FromDate IS NULL
+    OR @ToDate IS NULL
+    OR B.fVouchdt BETWEEN @FromDate AND @ToDate
+)
+
+AND (
+    @CustomerCode IS NULL
+    OR @CustomerCode=''
+    OR B.FCUCODE=@CustomerCode
+)
+
+AND (
+    @CustomerName IS NULL
+    OR @CustomerName=''
+    OR P.FACNAME LIKE '%' + @CustomerName + '%'
+)";
+
+                    using (SqlCommand totalCmd = new SqlCommand(totalQuery, conn))
+                    {
+                        totalCmd.Parameters.AddWithValue(
+                            "@FromDate",
+                            fromDate ?? (object)DBNull.Value);
+
+                        totalCmd.Parameters.AddWithValue(
+                            "@ToDate",
+                            toDate ?? (object)DBNull.Value);
+
+                        totalCmd.Parameters.AddWithValue(
+                            "@CustomerCode",
+                            string.IsNullOrWhiteSpace(customerCode)
+                                ? DBNull.Value
+                                : customerCode);
+
+                        totalCmd.Parameters.AddWithValue(
+                            "@CustomerName",
+                            string.IsNullOrWhiteSpace(customerName)
+                                ? DBNull.Value
+                                : customerName);
+
+                        using SqlDataReader reader = await totalCmd.ExecuteReaderAsync();
+
+                        if (await reader.ReadAsync())
+                        {
+                            totalWeight = reader["TotalWeight"] == DBNull.Value
+                                ? 0
+                                : Math.Round(Convert.ToDecimal(reader["TotalWeight"]), 3);
+
+                            totalAmount = reader["TotalAmount"] == DBNull.Value
+                                ? 0
+                                : Convert.ToDecimal(reader["TotalAmount"]);
+                        }
                     }
 
                     // Data query with pagination
@@ -145,6 +207,7 @@ namespace CHITSCHEME.Controllers
                         cmd.Parameters.AddWithValue("@offset", offset);
                         cmd.Parameters.AddWithValue("@pageSize", pageSize);
 
+
                         using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
@@ -175,8 +238,11 @@ namespace CHITSCHEME.Controllers
                     page,
                     pageSize,
                     totalRecords,
-                    totalPages = (int)Math.Ceiling(
-                        totalRecords / (double)pageSize),
+                    totalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+
+                    totalWeight,
+                    totalAmount,
+
                     data = result
                 });
             }
