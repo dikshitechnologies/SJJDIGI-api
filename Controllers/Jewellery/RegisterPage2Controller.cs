@@ -354,7 +354,12 @@ namespace CHITSCHEME.Controllers.Jewellery
                         ISNULL(fprofileImg, '') AS fprofileImg,
                         ISNULL(CAST(ReferredByUserId AS NVARCHAR(50)), '') AS ReferredBy,
                         CASE WHEN ReferredByUserId IS NOT NULL THEN 1 ELSE 0 END AS HasReferral,
-                        ISNULL(CAST(ReferId AS NVARCHAR(50)), '') AS ReferId
+                        ISNULL(CAST(ReferId AS NVARCHAR(50)), '') AS ReferId,
+                        ISNULL(CONVERT(NVARCHAR, ReferralDate, 120), '') AS ReferralDate,
+                        ISNULL(ReferralVoucherNo, '') AS ReferralVoucherNo,
+                        CASE WHEN ReferralEarnedVoucherNo IS NOT NULL THEN 1 ELSE 0 END AS HasReferralEarned,
+                        ISNULL(ReferralEarnedVoucherNo, '') AS ReferralEarnedVoucherNo,
+                        ISNULL(CONVERT(NVARCHAR, ReferralEarnedDate, 120), '') AS ReferralEarnedDate
                     FROM RegisterUsers 
                     WHERE UserID = @UserID";
                     }
@@ -369,16 +374,27 @@ namespace CHITSCHEME.Controllers.Jewellery
                             {
                                 var result = new
                                 {
-                                    UserName = reader["UserName"].ToString(),
-                                    Email = reader["Email"].ToString(),
+                                    UserName    = reader["UserName"].ToString(),
+                                    Email       = reader["Email"].ToString(),
                                     AddressLine = reader["AddressLine"].ToString(),
-                                    City = reader["City"].ToString(),
-                                    State = reader["State"].ToString(),
-                                    Pincode = reader["Pincode"].ToString(),
+                                    City        = reader["City"].ToString(),
+                                    State       = reader["State"].ToString(),
+                                    Pincode     = reader["Pincode"].ToString(),
                                     fprofileImg = reader["fprofileImg"].ToString(),
-                                    ReferredBy = reader["ReferredBy"].ToString(),
-                                    HasReferral = Convert.ToBoolean(reader["HasReferral"]),
-                                    ReferId = reader["ReferId"].ToString()
+
+                                    // ── Referral status ─────────────────────
+                                    ReferId          = reader["ReferId"].ToString(),
+
+                                    // As referee (used someone's code)
+                                    HasReferral      = Convert.ToBoolean(reader["HasReferral"]),
+                                    ReferredBy       = reader["ReferredBy"].ToString(),
+                                    ReferralDate     = reader["ReferralDate"].ToString(),
+                                    ReferralVoucherNo = reader["ReferralVoucherNo"].ToString(),
+
+                                    // As referrer (someone used their code)
+                                    HasReferralEarned       = Convert.ToBoolean(reader["HasReferralEarned"]),
+                                    ReferralEarnedVoucherNo = reader["ReferralEarnedVoucherNo"].ToString(),
+                                    ReferralEarnedDate      = reader["ReferralEarnedDate"].ToString()
                                 };
 
                                 return Ok(result);
