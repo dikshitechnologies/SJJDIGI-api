@@ -338,7 +338,9 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
 
                 // Get user details
                 var userCmd = new SqlCommand(@"
-                    SELECT UserName, PhoneNumber, Email, MPINHash, FailedMPINAttempts, MPINLockedUntil, DeviceId
+                    SELECT UserName, PhoneNumber, Email, MPINHash, FailedMPINAttempts, MPINLockedUntil, DeviceId,
+                           CASE WHEN ReferredByUserId IS NOT NULL THEN 1 ELSE 0 END AS HasReferral,
+                           ReferId
                     FROM RegisterUsers 
                     WHERE UserId = @UserId", connection);
                 userCmd.Parameters.AddWithValue("@UserId", request.UserId);
@@ -351,7 +353,8 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                 DateTime? lockedUntil = null;
                 string storedDeviceId = null;
                 bool fisEcatalog = false;
-
+                bool hasReferral = false;
+                string referId = null;
 
                 using (var reader = await userCmd.ExecuteReaderAsync())
                 {
@@ -364,6 +367,8 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                         failedAttempts = reader["FailedMPINAttempts"] != DBNull.Value ? Convert.ToInt32(reader["FailedMPINAttempts"]) : 0;
                         lockedUntil = reader["MPINLockedUntil"] != DBNull.Value ? (DateTime?)reader["MPINLockedUntil"] : null;
                         storedDeviceId = reader["DeviceId"]?.ToString();
+                        hasReferral = Convert.ToBoolean(reader["HasReferral"]);
+                        referId = reader["ReferId"]?.ToString();
                     }
                 }
 
@@ -468,7 +473,9 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                     phone = phone,
                     email = email,
                     userId = request.UserId,
-                    fisEcatalog = fisEcatalog
+                    fisEcatalog = fisEcatalog,
+                    hasReferral = hasReferral,
+                    referId = referId
                 });
             }
             catch (Exception ex)

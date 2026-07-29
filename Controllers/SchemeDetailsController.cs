@@ -865,7 +865,7 @@ ORDER BY FACNAME;
         }
 
         [HttpPost("InsertChitScheme")]
-        public IActionResult InsertChitScheme([FromBody] ChitSchemeModel model)
+        public async Task<IActionResult> InsertChitScheme([FromBody] ChitSchemeModel model)
         {
 
 
@@ -903,6 +903,25 @@ ORDER BY FACNAME;
                         InsertBledger(model.SchemeDetails, voucherNo, conn, transaction);
                         InsertLedger(model.SchemeDetails, voucherNo, conn, transaction);
                         transaction.Commit();
+
+                        // ── If user came via referral, save referral + stamp voucher ──
+                        if (model.HasReferral == 1
+                            && !string.IsNullOrWhiteSpace(model.UserId)
+                            && !string.IsNullOrWhiteSpace(model.ReferrerId))
+                        {
+                            using var stampCmd = new SqlCommand(@"
+                                UPDATE RegisterUsers
+                                SET ReferredByUserId  = @ReferrerId,
+                                    ReferralDate      = GETDATE(),
+                                    ReferralVoucherNo = @VoucherNo
+                                WHERE UserID = @UserId
+                                  AND ReferralVoucherNo IS NULL", conn);
+                            stampCmd.Parameters.AddWithValue("@ReferrerId", model.ReferrerId);
+                            stampCmd.Parameters.AddWithValue("@VoucherNo",  voucherNo);
+                            stampCmd.Parameters.AddWithValue("@UserId",     model.UserId);
+                            await stampCmd.ExecuteNonQueryAsync();
+                        }
+
                         return Ok(new
                         {
                             Message = "Insert successful.",

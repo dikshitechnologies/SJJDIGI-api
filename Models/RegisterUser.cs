@@ -19,6 +19,10 @@ namespace CHITSCHEME.Models
         [JsonProperty("DeviceType")]
         public string DeviceType { get; set; }
 
+        /// <summary>
+        /// Optional: Referral code entered by the new user during registration.
+        /// </summary>
+        [JsonProperty("ReferCode")]
+        public string? ReferCode { get; set; }
     }
-       
 }

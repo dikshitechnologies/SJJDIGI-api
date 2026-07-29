@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 namespace CHITSCHEME.Controllers.Jewellery
 {
     [Route("api/[controller]")]
@@ -98,6 +99,31 @@ namespace CHITSCHEME.Controllers.Jewellery
             }
         }
 
+        // ── Generate a unique 10-character alphanumeric Refer ID ────────────
+        private static string GenerateReferId()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            return new string(Enumerable.Range(0, 10)
+                .Select(_ => chars[random.Next(chars.Length)])
+                .ToArray());
+        }
+
+        private static async Task<string> GenerateUniqueReferIdAsync(SqlConnection conn)
+        {
+            string referId;
+            do
+            {
+                referId = GenerateReferId();
+                using var checkCmd = new SqlCommand(
+                    "SELECT 1 FROM RegisterUsers WHERE ReferId = @ReferId", conn);
+                checkCmd.Parameters.AddWithValue("@ReferId", referId);
+                var exists = await checkCmd.ExecuteScalarAsync();
+                if (exists == null) break;
+            } while (true);
+            return referId;
+        }
+
 
 
         [HttpPost("RegisterUser")]
@@ -147,8 +173,9 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 string maxRegisterIdQuery = "SELECT MAX(UserID) FROM RegisterUsers";
             string insertQuery = @"
-        INSERT INTO RegisterUsers (UserID,UserName, Email, PhoneNumber, PasswordHash,CreatedAt, FcmToken, DeviceType, LastLogin)
-        VALUES (@UserID,@UserName, @Email, @PhoneNumber, @PasswordHash,@CreatedAt, @FcmToken, @DeviceType, @LastLogin);";
+        INSERT INTO RegisterUsers (UserID,UserName, Email, PhoneNumber, PasswordHash,CreatedAt, FcmToken, DeviceType, LastLogin, ReferId)
+        VALUES (@UserID,@UserName, @Email, @PhoneNumber, @PasswordHash,@CreatedAt, @FcmToken, @DeviceType, @LastLogin, @ReferId);
+        SELECT SCOPE_IDENTITY();";
 
             using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
             {
@@ -185,11 +212,13 @@ namespace CHITSCHEME.Controllers.Jewellery
                         {
                             return Conflict(new { message = "Phonenumber  already exists" });
                         }
+
+                        // Generate unique Refer ID for new user
+                        string newReferId = await GenerateUniqueReferIdAsync(conn);
+
                         // Insert new user with the generated user code
                         using (SqlCommand cmd = new SqlCommand(insertQuery, conn))
                         {
-
-
                             cmd.Parameters.AddWithValue("@UserID", newUserCode);
                             cmd.Parameters.AddWithValue("@UserName", model.Firstname);
                             cmd.Parameters.AddWithValue("@Email", model.Email);
@@ -199,14 +228,50 @@ namespace CHITSCHEME.Controllers.Jewellery
                             cmd.Parameters.AddWithValue("@FcmToken", (object)model.FcmToken ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@DeviceType", (object)model.DeviceType ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@LastLogin", DateTime.Now);
+                            cmd.Parameters.AddWithValue("@ReferId", newReferId);
                             int rowsAffected = await cmd.ExecuteNonQueryAsync();
 
                             if (rowsAffected > 0)
                             {
+                                // ── Apply referral if a ReferCode was provided ──────────────────
+                                bool referralApplied = false;
+                                if (!string.IsNullOrWhiteSpace(model.ReferCode))
+                                {
+                                    // Look up the referrer by their ReferId
+                                    using var referrerCmd = new SqlCommand(
+                                        "SELECT UserID FROM RegisterUsers WHERE ReferId = @ReferId", conn);
+                                    referrerCmd.Parameters.AddWithValue("@ReferId", model.ReferCode.Trim().ToUpper());
+                                    var referrerIdObj = await referrerCmd.ExecuteScalarAsync();
+
+                                    if (referrerIdObj != null)
+                                    {
+                                        string referrerId = referrerIdObj.ToString();
+                                        // Must not refer themselves
+                                        if (referrerId != newUserCode)
+                                        {
+                                            using var applyCmd = new SqlCommand(@"
+                                                UPDATE RegisterUsers
+                                                SET ReferredByUserId = @ReferrerId,
+                                                    ReferralDate     = GETDATE()
+                                                WHERE UserID = @NewUserId
+                                                  AND ReferredByUserId IS NULL", conn);
+                                            applyCmd.Parameters.AddWithValue("@ReferrerId", referrerId);
+                                            applyCmd.Parameters.AddWithValue("@NewUserId", newUserCode);
+                                            await applyCmd.ExecuteNonQueryAsync();
+                                            referralApplied = true;
+                                        }
+                                    }
+                                }
+
                                 // ── Fire welcome notification (non-blocking) ──
                                 _ = SendWelcomeNotificationAsync(model.FcmToken, model.Firstname);
 
-                                return Ok(new { message = "User registered successfully" });
+                                return Ok(new
+                                {
+                                    message = "User registered successfully",
+                                    referId = newReferId,
+                                    referralApplied = referralApplied
+                                });
                             }
                             else
                             {
@@ -268,7 +333,10 @@ namespace CHITSCHEME.Controllers.Jewellery
                         '' AS City,
                         '' AS State,
                         '' AS Pincode,
-                        '' AS fprofileImg
+                        '' AS fprofileImg,
+                        '' AS ReferredBy,
+                        0 AS HasReferral,
+                        '' AS ReferId
                     FROM COMPANY
                     WHERE fcompcode = @UserID";
                     }
@@ -283,7 +351,10 @@ namespace CHITSCHEME.Controllers.Jewellery
                         ISNULL(City, '') AS City,
                         ISNULL(State, '') AS State,
                         ISNULL(Pincode, '') AS Pincode,
-                        ISNULL(fprofileImg, '') AS fprofileImg
+                        ISNULL(fprofileImg, '') AS fprofileImg,
+                        ISNULL(CAST(ReferredByUserId AS NVARCHAR(50)), '') AS ReferredBy,
+                        CASE WHEN ReferredByUserId IS NOT NULL THEN 1 ELSE 0 END AS HasReferral,
+                        ISNULL(CAST(ReferId AS NVARCHAR(50)), '') AS ReferId
                     FROM RegisterUsers 
                     WHERE UserID = @UserID";
                     }
@@ -304,7 +375,10 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     City = reader["City"].ToString(),
                                     State = reader["State"].ToString(),
                                     Pincode = reader["Pincode"].ToString(),
-                                    fprofileImg = reader["fprofileImg"].ToString()
+                                    fprofileImg = reader["fprofileImg"].ToString(),
+                                    ReferredBy = reader["ReferredBy"].ToString(),
+                                    HasReferral = Convert.ToBoolean(reader["HasReferral"]),
+                                    ReferId = reader["ReferId"].ToString()
                                 };
 
                                 return Ok(result);
