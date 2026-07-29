@@ -340,7 +340,13 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                 var userCmd = new SqlCommand(@"
                     SELECT UserName, PhoneNumber, Email, MPINHash, FailedMPINAttempts, MPINLockedUntil, DeviceId,
                            CASE WHEN ReferredByUserId IS NOT NULL THEN 1 ELSE 0 END AS HasReferral,
-                           ReferId
+                           ReferId,
+                           ISNULL(ReferredByUserId,       '')  AS ReferredByUserId,
+                           ISNULL(CONVERT(NVARCHAR,ReferralDate,120), '') AS ReferralDate,
+                           ISNULL(ReferralVoucherNo,      '')  AS ReferralVoucherNo,
+                           CASE WHEN ReferralEarnedVoucherNo IS NOT NULL THEN 1 ELSE 0 END AS HasReferralEarned,
+                           ISNULL(ReferralEarnedVoucherNo, '') AS ReferralEarnedVoucherNo,
+                           ISNULL(CONVERT(NVARCHAR,ReferralEarnedDate,120), '') AS ReferralEarnedDate
                     FROM RegisterUsers 
                     WHERE UserId = @UserId", connection);
                 userCmd.Parameters.AddWithValue("@UserId", request.UserId);
@@ -355,20 +361,32 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                 bool fisEcatalog = false;
                 bool hasReferral = false;
                 string referId = null;
+                string referredByUserId = null;
+                string referralDate = null;
+                string referralVoucherNo = null;
+                bool hasReferralEarned = false;
+                string referralEarnedVoucherNo = null;
+                string referralEarnedDate = null;
 
                 using (var reader = await userCmd.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                     {
-                        username = reader["UserName"].ToString();
-                        phone = reader["PhoneNumber"].ToString();
-                        email = reader["Email"]?.ToString();
-                        mpinHash = reader["MPINHash"]?.ToString();
+                        username       = reader["UserName"].ToString();
+                        phone          = reader["PhoneNumber"].ToString();
+                        email          = reader["Email"]?.ToString();
+                        mpinHash       = reader["MPINHash"]?.ToString();
                         failedAttempts = reader["FailedMPINAttempts"] != DBNull.Value ? Convert.ToInt32(reader["FailedMPINAttempts"]) : 0;
-                        lockedUntil = reader["MPINLockedUntil"] != DBNull.Value ? (DateTime?)reader["MPINLockedUntil"] : null;
+                        lockedUntil    = reader["MPINLockedUntil"] != DBNull.Value ? (DateTime?)reader["MPINLockedUntil"] : null;
                         storedDeviceId = reader["DeviceId"]?.ToString();
-                        hasReferral = Convert.ToBoolean(reader["HasReferral"]);
-                        referId = reader["ReferId"]?.ToString();
+                        hasReferral             = Convert.ToBoolean(reader["HasReferral"]);
+                        referId                 = reader["ReferId"]?.ToString();
+                        referredByUserId        = reader["ReferredByUserId"].ToString();
+                        referralDate            = reader["ReferralDate"].ToString();
+                        referralVoucherNo       = reader["ReferralVoucherNo"].ToString();
+                        hasReferralEarned       = Convert.ToBoolean(reader["HasReferralEarned"]);
+                        referralEarnedVoucherNo = reader["ReferralEarnedVoucherNo"].ToString();
+                        referralEarnedDate      = reader["ReferralEarnedDate"].ToString();
                     }
                 }
 
@@ -467,15 +485,27 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
 
                 return Ok(new
                 {
-                    success = true,
-                    token = token,
-                    username = username,
-                    phone = phone,
-                    email = email,
-                    userId = request.UserId,
+                    success    = true,
+                    token      = token,
+                    username   = username,
+                    phone      = phone,
+                    email      = email,
+                    userId     = request.UserId,
                     fisEcatalog = fisEcatalog,
-                    hasReferral = hasReferral,
-                    referId = referId
+
+                    // ── Referral status ──────────────────────────────────────
+                    referId                 = referId,
+
+                    // As referee (User 2 — used someone's refer code)
+                    hasReferral             = hasReferral,
+                    referredByUserId        = referredByUserId,
+                    referralDate            = referralDate,
+                    referralVoucherNo       = referralVoucherNo,
+
+                    // As referrer (User 1 — someone used their refer code)
+                    hasReferralEarned       = hasReferralEarned,
+                    referralEarnedVoucherNo = referralEarnedVoucherNo,
+                    referralEarnedDate      = referralEarnedDate
                 });
             }
             catch (Exception ex)

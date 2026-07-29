@@ -904,22 +904,34 @@ ORDER BY FACNAME;
                         InsertLedger(model.SchemeDetails, voucherNo, conn, transaction);
                         transaction.Commit();
 
-                        // ── If user came via referral, save referral + stamp voucher ──
+                        // ── Referral: stamp BOTH users when hasReferral = 1 ──────────
                         if (model.HasReferral == 1
                             && !string.IsNullOrWhiteSpace(model.UserId)
                             && !string.IsNullOrWhiteSpace(model.ReferrerId))
                         {
-                            using var stampCmd = new SqlCommand(@"
+                            // User 2 (referee) — save who referred them + which voucher
+                            using var stampRefereeCmd = new SqlCommand(@"
                                 UPDATE RegisterUsers
                                 SET ReferredByUserId  = @ReferrerId,
                                     ReferralDate      = GETDATE(),
                                     ReferralVoucherNo = @VoucherNo
                                 WHERE UserID = @UserId
                                   AND ReferralVoucherNo IS NULL", conn);
-                            stampCmd.Parameters.AddWithValue("@ReferrerId", model.ReferrerId);
-                            stampCmd.Parameters.AddWithValue("@VoucherNo",  voucherNo);
-                            stampCmd.Parameters.AddWithValue("@UserId",     model.UserId);
-                            await stampCmd.ExecuteNonQueryAsync();
+                            stampRefereeCmd.Parameters.AddWithValue("@ReferrerId", model.ReferrerId);
+                            stampRefereeCmd.Parameters.AddWithValue("@VoucherNo",  voucherNo);
+                            stampRefereeCmd.Parameters.AddWithValue("@UserId",     model.UserId);
+                            await stampRefereeCmd.ExecuteNonQueryAsync();
+
+                            // User 1 (referrer) — track that their referral was used + voucher that triggered it
+                            using var stampReferrerCmd = new SqlCommand(@"
+                                UPDATE RegisterUsers
+                                SET ReferralEarnedVoucherNo = @VoucherNo,
+                                    ReferralEarnedDate      = GETDATE()
+                                WHERE UserID = @ReferrerId
+                                  AND ReferralEarnedVoucherNo IS NULL", conn);
+                            stampReferrerCmd.Parameters.AddWithValue("@VoucherNo",  voucherNo);
+                            stampReferrerCmd.Parameters.AddWithValue("@ReferrerId", model.ReferrerId);
+                            await stampReferrerCmd.ExecuteNonQueryAsync();
                         }
 
                         return Ok(new
