@@ -966,9 +966,9 @@ ORDER BY FACNAME;
             {
                 string insertBledger = @"
         INSERT INTO Bledger 
-        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,fCompCode,FACTWT,FBWT,FBAMT ,FFINALBAMT,FGRATE)
+        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,FACTWT,FBWT,FBAMT,FFINALBAMT,FGRATE)
         VALUES 
-        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,'001',@FACTWT,@FBWT,@FBAMT,@FFINALBAMT,@FGRATE)";
+        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,@FACTWT,@FBWT,@FBAMT,@FFINALBAMT,@FGRATE)";
 
                 var item = schemeList[0]; // Access the first item in the list
 
@@ -1023,9 +1023,9 @@ ORDER BY FACNAME;
         {
             string insertLedger = @"
     INSERT INTO Ledger 
-    (faccode, fvrno, fType, fDate, fCrDb, fCaCb, fvrAmount, fRefcode, fCompCode, fRefNo, fid, FDUE, FPRINT, fNarration, FMOP,fwt,fCompCode)
+    (faccode, fvrno, fType, fDate, fCrDb, fCaCb, fvrAmount, fRefcode, fCompCode, fRefNo, fid, FDUE, FPRINT, fNarration, FMOP,fwt)
     VALUES 
-    (@faccode, @fvrno, @fType, @fDate, @fCrDb, @fCaCb, @fvrAmount, @fRefcode, @fCompCode, @fRefNo, @fid, @FDUE, @FPRINT, @fNarration, @FMOP,@fwt,'001')";
+    (@faccode, @fvrno, @fType, @fDate, @fCrDb, @fCaCb, @fvrAmount, @fRefcode, @fCompCode, @fRefNo, @fid, @FDUE, @FPRINT, @fNarration, @FMOP,@fwt)";
 
             if (schemeList.Count > 0)
             {
