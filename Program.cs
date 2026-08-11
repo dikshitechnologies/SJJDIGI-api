@@ -20,7 +20,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "pukhrajchit",
+        Title = "sjjdigi",
         Version = "v1"
     });
 
@@ -108,11 +108,11 @@ app.UseSwaggerUI(c =>
 
     if (env == Environments.Production)
     {
-        c.SwaggerEndpoint("/pukhrajchit/swagger/v1/swagger.json", "pukhrajchit v1");
+        c.SwaggerEndpoint("/sjjdigi/swagger/v1/swagger.json", "sjjdigi v1");
     }
     else
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "pukhrajchit v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "sjjdigi v1");
     }
 });
 
