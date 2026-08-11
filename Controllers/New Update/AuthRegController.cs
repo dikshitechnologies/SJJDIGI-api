@@ -323,7 +323,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                         decimal rate = Convert.ToDecimal(reader1["fRate"]);
 
                         // GOLD: 14K, 18K, 22K, 24K
-                        if (code == "0003" || code == "0002" || code == "0014" || code == "0004")
+                        if (code == "0002" )
                         {
                             responseDivisions.divisions.gold.Add(new
                             {
