@@ -17,6 +17,13 @@ namespace CHITSCHEME.Models
         /// Required when HasReferral = 1.
         /// </summary>
         public string ReferrerId { get; set; }
+
+        /// <summary>
+        /// Razorpay payment_id (e.g. pay_XXXX). Used for idempotency —
+        /// if this payment was already inserted, the existing VoucherNo is returned
+        /// without a duplicate insert.
+        /// </summary>
+        public string RazorpayPaymentId { get; set; }
     }
 
 
