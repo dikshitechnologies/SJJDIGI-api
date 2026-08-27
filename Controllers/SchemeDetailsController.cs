@@ -808,9 +808,20 @@ ORDER BY FACNAME;
 
 
         static string gobaldatacode;
+
+        /// <summary>
+        /// Generates the next CT voucher number.
+        /// UPDLOCK + HOLDLOCK ensures that under concurrent requests each call reads
+        /// a different MAX — eliminating the race condition where 10 simultaneous
+        /// payments all computed the same voucher number and 9 rolled back.
+        /// </summary>
         public static string GetSingleChitSchemeVoucherNo(SqlConnection conn, SqlTransaction transaction)
         {
-            string query = "SELECT MAX(fVouchno) FROM Bledger WHERE fbILLType = 'CT' and FONLINE = 'Y'";
+            // UPDLOCK  — converts the shared lock to an update lock so no other reader
+            //            can acquire a conflicting lock until this transaction commits.
+            // HOLDLOCK  — promotes to a serializable range lock so no new rows can be
+            //             inserted between the SELECT and the subsequent INSERT.
+            string query = "SELECT MAX(fVouchno) FROM Bledger WITH (UPDLOCK, HOLDLOCK) WHERE fBILLType = 'CT' AND FONLINE = 'Y'";
             int startNumber = 1;
 
             using var cmd = new SqlCommand(query, conn, transaction);
@@ -850,7 +861,9 @@ ORDER BY FACNAME;
         }
         private int GetNextFDUE(SqlConnection conn, SqlTransaction transaction, string schemeCode)
         {
-            string query = "SELECT ISNULL(MAX(FDUE), 0) FROM ledger WHERE fid = @fid";
+            // UPDLOCK prevents two concurrent transactions from reading the same MAX(FDUE)
+            // for the same scheme and generating duplicate due numbers.
+            string query = "SELECT ISNULL(MAX(FDUE), 0) FROM ledger WITH (UPDLOCK, HOLDLOCK) WHERE fid = @fid AND fCrDb = 'CR' AND fType = 'CT'";
 
             using (SqlCommand cmd = new SqlCommand(query, conn, transaction))
             {
@@ -867,14 +880,39 @@ ORDER BY FACNAME;
         [HttpPost("InsertChitScheme")]
         public async Task<IActionResult> InsertChitScheme([FromBody] ChitSchemeModel model)
         {
-
-
             try
             {
                 using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
                 {
                     conn.Open();
-                    SqlTransaction transaction = conn.BeginTransaction();
+
+                    // ── Idempotency guard ──────────────────────────────────────────────
+                    // If a RazorpayPaymentId is provided (set by both the app and the
+                    // webhook), check whether this payment was already inserted.
+                    // This prevents a double-insert when the webhook fires AND the app
+                    // also comes back online and retries.
+                    if (!string.IsNullOrWhiteSpace(model.RazorpayPaymentId))
+                    {
+                        using var idempotencyCmd = new SqlCommand(
+                            "SELECT TOP 1 fVouchno FROM Bledger WHERE FRazorpayPaymentId = @pid AND fBillType = 'CT'",
+                            conn);
+                        idempotencyCmd.Parameters.AddWithValue("@pid", model.RazorpayPaymentId);
+                        var existingVoucher = await idempotencyCmd.ExecuteScalarAsync();
+                        if (existingVoucher != null && existingVoucher != DBNull.Value)
+                        {
+                            // Already inserted — return success with the existing voucher number.
+                            return Ok(new
+                            {
+                                Message = "Already inserted.",
+                                VoucherNo = existingVoucher.ToString()
+                            });
+                        }
+                    }
+
+                    // Use Serializable isolation so the UPDLOCK hints inside
+                    // GetSingleChitSchemeVoucherNo and GetNextFDUE are fully honoured
+                    // and concurrent requests queue up rather than colliding.
+                    SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable);
 
                     try
                     {
@@ -900,7 +938,7 @@ ORDER BY FACNAME;
                             item.FDUE = nextDue.ToString(); // assign back to model
                         }
 
-                        InsertBledger(model.SchemeDetails, voucherNo, conn, transaction);
+                        InsertBledger(model.SchemeDetails, voucherNo, conn, transaction, model.RazorpayPaymentId);
                         InsertLedger(model.SchemeDetails, voucherNo, conn, transaction);
                         transaction.Commit();
 
@@ -960,15 +998,21 @@ ORDER BY FACNAME;
 
 
       
-        private static void InsertBledger(List<SchemeList> schemeList, string voucherNo, SqlConnection conn, SqlTransaction transaction)
+        private static void InsertBledger(List<SchemeList> schemeList, string voucherNo, SqlConnection conn, SqlTransaction transaction, string razorpayPaymentId = null)
+        {
+            InsertBledgerPublic(schemeList, voucherNo, conn, transaction, razorpayPaymentId);
+        }
+
+        /// <summary>Public entry-point used by the Razorpay webhook controller.</summary>
+        public static void InsertBledgerPublic(List<SchemeList> schemeList, string voucherNo, SqlConnection conn, SqlTransaction transaction, string razorpayPaymentId = null)
         {
             if (schemeList.Count > 0)  // Ensure there's at least one item in the list
             {
                 string insertBledger = @"
         INSERT INTO Bledger 
-        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,FACTWT,FBWT,FBAMT,FFINALBAMT,FGRATE)
+        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,FACTWT,FBWT,FBAMT,FFINALBAMT,FGRATE,FRazorpayPaymentId)
         VALUES 
-        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,@FACTWT,@FBWT,@FBAMT,@FFINALBAMT,@FGRATE)";
+        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,@FACTWT,@FBWT,@FBAMT,@FFINALBAMT,@FGRATE,@FRazorpayPaymentId)";
 
                 var item = schemeList[0]; // Access the first item in the list
 
@@ -1013,6 +1057,8 @@ ORDER BY FACNAME;
                     cmd.Parameters.AddWithValue("@FBAMT", item.fbamt ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@FFINALBAMT", item.fbfinalamt ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@FGRATE", item.FGRATE ?? (object)DBNull.Value);
+                    // Store the Razorpay payment ID for idempotency lookup
+                    cmd.Parameters.AddWithValue("@FRazorpayPaymentId", razorpayPaymentId ?? (object)DBNull.Value);
 
                     cmd.ExecuteNonQuery();
                 }
@@ -1020,6 +1066,12 @@ ORDER BY FACNAME;
         }
 
         private static void InsertLedger(List<SchemeList> schemeList, string voucherNo, SqlConnection conn, SqlTransaction transaction)
+        {
+            InsertLedgerPublic(schemeList, voucherNo, conn, transaction);
+        }
+
+        /// <summary>Public entry-point used by the Razorpay webhook controller.</summary>
+        public static void InsertLedgerPublic(List<SchemeList> schemeList, string voucherNo, SqlConnection conn, SqlTransaction transaction)
         {
             string insertLedger = @"
     INSERT INTO Ledger 
