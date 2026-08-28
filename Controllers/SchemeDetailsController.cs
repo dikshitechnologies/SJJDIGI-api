@@ -1046,7 +1046,7 @@ ORDER BY FACNAME;
                     cmd.Parameters.AddWithValue("@FNEFTCODE", "");
                     cmd.Parameters.AddWithValue("@FNARRATION", "");
                     cmd.Parameters.AddWithValue("@FCHQCODE", "");
-                    cmd.Parameters.AddWithValue("@FUPICODE", "00068");
+                    cmd.Parameters.AddWithValue("@FUPICODE", "00118");
                     cmd.Parameters.AddWithValue("@FORDERSTATUS", "Y");
 
 
@@ -1086,14 +1086,14 @@ ORDER BY FACNAME;
                 // Insert DR entry
                 using (SqlCommand cmd = new SqlCommand(insertLedger, conn, transaction))
                 {
-                    cmd.Parameters.AddWithValue("@faccode", "00068");
+                    cmd.Parameters.AddWithValue("@faccode", firstItem.CusCode);
                     cmd.Parameters.AddWithValue("@fvrno", voucherNo);
                     cmd.Parameters.AddWithValue("@fType", "CT");
                     cmd.Parameters.AddWithValue("@fDate", DateTime.Now.Date);
                     cmd.Parameters.AddWithValue("@fCrDb", "DR");
                     cmd.Parameters.AddWithValue("@fCaCb", "D");
                     cmd.Parameters.AddWithValue("@fvrAmount", firstItem.TotalAmt);
-                    cmd.Parameters.AddWithValue("@fRefcode", firstItem.CusCode);
+                    cmd.Parameters.AddWithValue("@fRefcode", "00045");
                     cmd.Parameters.AddWithValue("@fCompCode", firstItem.CompCode);
                     cmd.Parameters.AddWithValue("@fRefNo", DBNull.Value);
                     cmd.Parameters.AddWithValue("@fid", firstItem.SchemeCode);
@@ -1118,7 +1118,7 @@ ORDER BY FACNAME;
                     cmd.Parameters.AddWithValue("@fCrDb", "CR");
                     cmd.Parameters.AddWithValue("@fCaCb", "C");
                     cmd.Parameters.AddWithValue("@fvrAmount", item.Amount);
-                    cmd.Parameters.AddWithValue("@fRefcode", "00068");
+                    cmd.Parameters.AddWithValue("@fRefcode", item.CusCode);
                     cmd.Parameters.AddWithValue("@fCompCode", item.CompCode);
                     cmd.Parameters.AddWithValue("@fRefNo", item.SchemeCode);
                     cmd.Parameters.AddWithValue("@fid", item.SchemeCode);
