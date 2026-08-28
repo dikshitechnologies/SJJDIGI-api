@@ -516,17 +516,17 @@ ORDER BY FACNAME;
 
                     decimal weightch = 0;
                     var fdigicr = reader["FDIGICR"]?.ToString();
-                    if (schemeType == "W" && reader["FDIGITYPE"]?.ToString() == "WT" )
+                    if (schemeType == "W" && reader["FDIGITYPE"]?.ToString() == "WT")
                     {
-                        if(fdigicr == "22K" && rate22K != 0)
+                        if (fdigicr == "22K" && rate22K != 0)
                         {
                             weight = amount / rate22K;
                         }
-                        else if(fdigicr == "24K" && rate24K != 0)
+                        else if (fdigicr == "24K" && rate24K != 0)
                         {
                             weight = amount / rate24K;
                         }
-                      
+
                     }
                     DateTime? joinDate = reader["FDATE"] != DBNull.Value
                     ? Convert.ToDateTime(reader["FDATE"])
@@ -553,9 +553,9 @@ ORDER BY FACNAME;
                         fdue_comparison = reader["FDUE_Comparison"]?.ToString(),
                         iS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]?.ToString(),
                         fdigicr = reader["FDIGICR"]?.ToString(),
-                        FSCHEMETYPE = reader["FSCHEMETYPE"] == DBNull.Value ||string.IsNullOrWhiteSpace(reader["FSCHEMETYPE"].ToString())? "R": reader["FSCHEMETYPE"].ToString(),
-                         fcompcode = reader["FCOMPCODE"]?.ToString(),
-                        weight = weight > 0 ? weight.ToString("0.000") : null,                         
+                        FSCHEMETYPE = reader["FSCHEMETYPE"] == DBNull.Value || string.IsNullOrWhiteSpace(reader["FSCHEMETYPE"].ToString()) ? "R" : reader["FSCHEMETYPE"].ToString(),
+                        fcompcode = reader["FCOMPCODE"]?.ToString(),
+                        weight = weight > 0 ? weight.ToString("0.000") : null,
                         joinDate = joinDate?.ToString("dd/MM/yyyy") ?? "",
                         maturityDate = maturityDate?.ToString("dd/MM/yyyy") ?? "",
                         maturityStatus = maturityStatus,
@@ -956,8 +956,8 @@ ORDER BY FACNAME;
                                 WHERE UserID = @UserId
                                   AND ReferralVoucherNo IS NULL", conn);
                             stampRefereeCmd.Parameters.AddWithValue("@ReferrerId", model.ReferrerId);
-                            stampRefereeCmd.Parameters.AddWithValue("@VoucherNo",  voucherNo);
-                            stampRefereeCmd.Parameters.AddWithValue("@UserId",     model.UserId);
+                            stampRefereeCmd.Parameters.AddWithValue("@VoucherNo", voucherNo);
+                            stampRefereeCmd.Parameters.AddWithValue("@UserId", model.UserId);
                             await stampRefereeCmd.ExecuteNonQueryAsync();
 
                             // User 1 (referrer) — track that their referral was used + voucher that triggered it
@@ -967,7 +967,7 @@ ORDER BY FACNAME;
                                     ReferralEarnedDate      = GETDATE()
                                 WHERE UserID = @ReferrerId
                                   AND ReferralEarnedVoucherNo IS NULL", conn);
-                            stampReferrerCmd.Parameters.AddWithValue("@VoucherNo",  voucherNo);
+                            stampReferrerCmd.Parameters.AddWithValue("@VoucherNo", voucherNo);
                             stampReferrerCmd.Parameters.AddWithValue("@ReferrerId", model.ReferrerId);
                             await stampReferrerCmd.ExecuteNonQueryAsync();
                         }
@@ -997,7 +997,7 @@ ORDER BY FACNAME;
         }
 
 
-      
+
         private static void InsertBledger(List<SchemeList> schemeList, string voucherNo, SqlConnection conn, SqlTransaction transaction, string razorpayPaymentId = null)
         {
             InsertBledgerPublic(schemeList, voucherNo, conn, transaction, razorpayPaymentId);
@@ -1010,9 +1010,9 @@ ORDER BY FACNAME;
             {
                 string insertBledger = @"
         INSERT INTO Bledger 
-        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,FACTWT,FBWT,FBAMT,FFINALBAMT,FGRATE,FRazorpayPaymentId)
+        (fCucode, fvType, fVouchno, fVouchdt, fBillAmt, fBalAmt, fBillType, fUser, fCompCode, FSTAT, FREFNO, FPAYMODE, FCASH, FSMSSALES, FSMSCHIT, FINT, fwt, FRATE, FCARD, FUPI, FNEFT, FCHQ, FONLINE, fOpCode, FCARDCODE, FNEFTCODE, FNARRATION, FCHQCODE,FUPICODE,FORDERSTATUS,FACTWT,FBWT,FBAMT,FFINALBAMT,FGRATE,FRazorpayPaymentId,FTIME)
         VALUES 
-        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,@FACTWT,@FBWT,@FBAMT,@FFINALBAMT,@FGRATE,@FRazorpayPaymentId)";
+        (@fCucode, @fvType, @fVouchno, @fVouchdt, @fBillAmt, @fBalAmt, @fBillType, @fUser, @fCompCode, @FSTAT, @FREFNO, @FPAYMODE, @FCASH, @FSMSSALES, @FSMSCHIT, @FINT, @fwt, @FRATE, @FCARD, @FUPI, @FNEFT, @FCHQ, @FONLINE,@fOpCode,@FCARDCODE,@FNEFTCODE,@FNARRATION,@FCHQCODE,@FUPICODE,@FORDERSTATUS,@FACTWT,@FBWT,@FBAMT,@FFINALBAMT,@FGRATE,@FRazorpayPaymentId,@FTIME)";
 
                 var item = schemeList[0]; // Access the first item in the list
 
@@ -1034,7 +1034,7 @@ ORDER BY FACNAME;
                     cmd.Parameters.AddWithValue("@FSMSSALES", "N");
                     cmd.Parameters.AddWithValue("@FSMSCHIT", "N");
                     cmd.Parameters.AddWithValue("@FINT", "0");
-                   
+
                     cmd.Parameters.AddWithValue("@FRATE", item.Amount);
                     cmd.Parameters.AddWithValue("@FCARD", "0");
                     cmd.Parameters.AddWithValue("@FUPI", item.Amount);
@@ -1046,9 +1046,9 @@ ORDER BY FACNAME;
                     cmd.Parameters.AddWithValue("@FNEFTCODE", "");
                     cmd.Parameters.AddWithValue("@FNARRATION", "");
                     cmd.Parameters.AddWithValue("@FCHQCODE", "");
-                    cmd.Parameters.AddWithValue("@FUPICODE", "00118");
+                    cmd.Parameters.AddWithValue("@FUPICODE", "00474");
                     cmd.Parameters.AddWithValue("@FORDERSTATUS", "Y");
-
+                    cmd.Parameters.AddWithValue("@FTIME", DateTime.Now.ToString("HH:mm"));
 
 
                     cmd.Parameters.AddWithValue("@fwt", item.finalwt ?? (object)DBNull.Value);
@@ -1086,14 +1086,14 @@ ORDER BY FACNAME;
                 // Insert DR entry
                 using (SqlCommand cmd = new SqlCommand(insertLedger, conn, transaction))
                 {
-                    cmd.Parameters.AddWithValue("@faccode", firstItem.CusCode);
+                    cmd.Parameters.AddWithValue("@faccode", "00474");
                     cmd.Parameters.AddWithValue("@fvrno", voucherNo);
                     cmd.Parameters.AddWithValue("@fType", "CT");
                     cmd.Parameters.AddWithValue("@fDate", DateTime.Now.Date);
                     cmd.Parameters.AddWithValue("@fCrDb", "DR");
                     cmd.Parameters.AddWithValue("@fCaCb", "D");
                     cmd.Parameters.AddWithValue("@fvrAmount", firstItem.TotalAmt);
-                    cmd.Parameters.AddWithValue("@fRefcode", "00045");
+                    cmd.Parameters.AddWithValue("@fRefcode", firstItem.CusCode);
                     cmd.Parameters.AddWithValue("@fCompCode", firstItem.CompCode);
                     cmd.Parameters.AddWithValue("@fRefNo", DBNull.Value);
                     cmd.Parameters.AddWithValue("@fid", firstItem.SchemeCode);
@@ -1118,7 +1118,7 @@ ORDER BY FACNAME;
                     cmd.Parameters.AddWithValue("@fCrDb", "CR");
                     cmd.Parameters.AddWithValue("@fCaCb", "C");
                     cmd.Parameters.AddWithValue("@fvrAmount", item.Amount);
-                    cmd.Parameters.AddWithValue("@fRefcode", item.CusCode);
+                    cmd.Parameters.AddWithValue("@fRefcode", "00474");
                     cmd.Parameters.AddWithValue("@fCompCode", item.CompCode);
                     cmd.Parameters.AddWithValue("@fRefNo", item.SchemeCode);
                     cmd.Parameters.AddWithValue("@fid", item.SchemeCode);
