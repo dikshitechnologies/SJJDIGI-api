@@ -25,7 +25,7 @@ namespace CHITSCHEME.Controllers.FireBaseMsg
                 if (_firebaseInitialized) return;
 
                 var jsonPath = Path.Combine(AppContext.BaseDirectory,
-                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-3a492ad39d.json");
+                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-9feeeabbdf.json");
 
                 if (FirebaseApp.DefaultInstance == null)
                 {
@@ -91,7 +91,7 @@ namespace CHITSCHEME.Controllers.FireBaseMsg
                     using (var stream = new FileStream(fullPath, FileMode.Create))
                         await image.CopyToAsync(stream);
 
-                    imageUrl = $"https://app.dikshitech.com/pukhrajchit/notification/{fileName}";
+                    imageUrl = $"https://app.dikshitech.com/SJJDIGI/notification/{fileName}";
                 }
 
                 // ── 2. Fetch all valid FCM tokens ────────────────────────────────

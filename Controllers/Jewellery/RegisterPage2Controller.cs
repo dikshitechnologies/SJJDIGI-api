@@ -28,7 +28,7 @@ namespace CHITSCHEME.Controllers.Jewellery
             {
                 if (_firebaseInitialized) return;
                 var jsonPath = Path.Combine(AppContext.BaseDirectory,
-                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-3a492ad39d.json");
+                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-9feeeabbdf.json");
                 if (FirebaseApp.DefaultInstance == null)
                 {
                     FirebaseApp.Create(new AppOptions
@@ -52,7 +52,7 @@ namespace CHITSCHEME.Controllers.Jewellery
             {
                 EnsureFirebaseInitialized();
 
-                string title = "Welcome to Pukhraj Elite Jewellers! 🎉";
+                string title = "Welcome to Sri Jain Jewellers! 🎉";
                 string body  = $"Hi {userName}! Explore our latest collections, daily gold rates, and exclusive savings schemes.";
 
                 var message = new Message

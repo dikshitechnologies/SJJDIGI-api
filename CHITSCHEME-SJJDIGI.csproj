@@ -30,7 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="sri-jain-walajapet-firebase-adminsdk-fbsvc-3a492ad39d.json">
+    <None Update="sri-jain-walajapet-firebase-adminsdk-fbsvc-9feeeabbdf.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
