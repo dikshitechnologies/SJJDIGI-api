@@ -25,7 +25,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 if (_firebaseInitialized) return;
 
                 var jsonPath = Path.Combine(AppContext.BaseDirectory,
-                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-3a492ad39d.json");
+                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-9feeeabbdf.json");
 
                 // Only create if no default app exists yet
                 if (FirebaseApp.DefaultInstance == null)
@@ -67,7 +67,7 @@ namespace CHITSCHEME.Controllers.Jewellery
 
                 string title    = "Today's Rates!";
                 string body     = $"Gold 22K - ₹{goldRate} per gram\nSilver - ₹{silverRate} per gram";
-                string imageUrl = "https://app.dikshitech.com/pukhrajchit/NotifyImg/Pukhraj.png";
+                string imageUrl = "https://app.dikshitech.com/SJJDIGI/NotifyImg/Pukhraj.png";
 
                 var dataPayload = new Dictionary<string, string>
                 {

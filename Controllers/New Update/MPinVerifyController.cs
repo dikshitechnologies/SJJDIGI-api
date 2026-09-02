@@ -96,7 +96,7 @@ namespace CHITSCHEME_PukhRaj.Controllers.New_Update
                     // Send OTP via ping4sms gateway
                     // Template: Dear Customer, Your OTP for {#var#} is {#var#}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI
                     string smsMessage = Uri.EscapeDataString(
-                        $"Dear Customer, Your OTP for Pukhraj Elite Jewellers is {otp}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI");
+                        $"Dear Customer, Your OTP for Sri Jain Jewellers is {otp}. This OTP is valid for 10 minutes. Please do not share this OTP with anyone -DIKSHI");
 
                     string smsUrl = $"https://site.ping4sms.com/api/smsapi" +
                         $"?key=6dad4e29de7c4fcf3ec27b96f44c5934" +
