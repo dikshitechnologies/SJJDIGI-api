@@ -9,6 +9,13 @@ namespace CHITSCHEME.Controllers.ECatalog
     [ApiController]
     public class ItemPurchaseOPController : ControllerBase
     {
+
+        private readonly IWebHostEnvironment _env;
+
+        public ItemPurchaseOPController(IWebHostEnvironment env)
+        {
+            _env = env;
+        }
         private static readonly string[] AllowedExt = { ".jpg", ".jpeg", ".png", ".webp" };
 
         // ── Save one image to wwwroot/uploads ───────────────────────────────
@@ -332,23 +339,119 @@ WHERE Voucher = @Voucher";
         // ===================================================================
         // DELETE  api/ItemPurchaseOP/Delete/{voucher}
         // ===================================================================
-        [HttpDelete("Delete/{voucher}")]
-        public async Task<IActionResult> Delete([FromRoute] string voucher)
+        [HttpDelete("Delete/{prefix}")]
+        public async Task<IActionResult> Delete([FromRoute] string prefix)
         {
-            if (string.IsNullOrWhiteSpace(voucher))
-                return BadRequest(new { message = "Voucher is required." });
+            if (string.IsNullOrWhiteSpace(prefix))
+                return BadRequest(new { message = "Prefix is required." });
+
             try
             {
                 using var con = new SqlConnection(DBHelper.GetConnection());
                 await con.OpenAsync();
-                using var cmd = new SqlCommand("DELETE FROM ItemPurchaseOP WHERE Voucher=@v", con);
-                cmd.Parameters.AddWithValue("@v", voucher);
-                int rows = await cmd.ExecuteNonQueryAsync();
-                if (rows > 0) return Ok(new { message = "Record deleted.", Voucher = voucher });
-                return NotFound(new { message = "No record found." });
+
+                // 1. Get image names before deleting
+                var imageFiles = new List<string>();
+
+                using (var selectCmd = new SqlCommand(@"
+            SELECT fImage1, fImage2, fImage3, fImage4
+            FROM ItemPurchaseOP
+            WHERE fPrefix = @prefix", con))
+                {
+                    selectCmd.Parameters.AddWithValue("@prefix", prefix);
+
+                    using var reader = await selectCmd.ExecuteReaderAsync();
+
+                    while (await reader.ReadAsync())
+                    {
+                        for (int i = 0; i < 4; i++)
+                        {
+                            if (!reader.IsDBNull(i))
+                            {
+                                string fileName = reader.GetString(i);
+
+                                if (!string.IsNullOrWhiteSpace(fileName))
+                                    imageFiles.Add(fileName);
+                            }
+                        }
+                    }
+                }
+
+                // 2. Delete records using fPrefix
+                using var deleteCmd = new SqlCommand(@"
+            DELETE FROM ItemPurchaseOP
+            WHERE fPrefix = @prefix", con);
+
+                deleteCmd.Parameters.AddWithValue("@prefix", prefix);
+
+                int rows = await deleteCmd.ExecuteNonQueryAsync();
+
+                if (rows == 0)
+                {
+                    return NotFound(new
+                    {
+                        message = "No record found for the given prefix.",
+                        Prefix = prefix
+                    });
+                }
+
+                // 3. Delete images from www/uploads
+                string uploadFolder = Path.Combine(
+                    _env.ContentRootPath,
+                    "www",
+                    "uploads"
+                );
+
+                foreach (string fileName in imageFiles.Distinct())
+                {
+                    try
+                    {
+                        // Prevent path traversal
+                        string safeFileName = Path.GetFileName(fileName);
+
+                        if (string.IsNullOrWhiteSpace(safeFileName))
+                            continue;
+
+                        string imagePath = Path.Combine(
+                            uploadFolder,
+                            safeFileName
+                        );
+
+                        if (System.IO.File.Exists(imagePath))
+                        {
+                            System.IO.File.Delete(imagePath);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore image deletion errors
+                    }
+                }
+
+                return Ok(new
+                {
+                    message = "Records and associated images deleted successfully.",
+                    Prefix = prefix,
+                    DeletedRecords = rows,
+                    DeletedImages = imageFiles.Distinct().ToList()
+                });
             }
-            catch (SqlException sqlEx) { return StatusCode(500, new { message = "Database error.", error = sqlEx.Message }); }
-            catch (Exception ex)       { return StatusCode(500, new { message = "Internal server error.", error = ex.Message }); }
+            catch (SqlException sqlEx)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Database error.",
+                    error = sqlEx.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Internal server error.",
+                    error = ex.Message
+                });
+            }
         }
 
         // ===================================================================
