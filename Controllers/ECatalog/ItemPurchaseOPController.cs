@@ -19,7 +19,8 @@ namespace CHITSCHEME.Controllers.ECatalog
         private static readonly string[] AllowedExt = { ".jpg", ".jpeg", ".png", ".webp" };
 
         // ── Save one image to wwwroot/uploads ───────────────────────────────
-        private async Task<string?> SaveImageAsync(IFormFile? file, string itemcode, int slot)
+        // File name pattern: {voucher}_{slot}.{ext}  e.g. OP000063AA_1.jpg
+        private async Task<string?> SaveImageAsync(IFormFile? file, string voucher, int slot)
         {
             if (file == null || file.Length == 0) return null;
 
@@ -32,13 +33,14 @@ namespace CHITSCHEME.Controllers.ECatalog
             string folder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
             if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
 
+            // Delete any previous file for this voucher+slot regardless of extension
             foreach (var e in AllowedExt)
             {
-                string old = Path.Combine(folder, $"Item_{itemcode}__{slot}{e}");
+                string old = Path.Combine(folder, $"{voucher}_{slot}{e}");
                 if (System.IO.File.Exists(old)) System.IO.File.Delete(old);
             }
 
-            string fileName = $"Item_{itemcode}__{slot}{ext}";
+            string fileName = $"{voucher}_{slot}{ext}";
             using var stream = new FileStream(Path.Combine(folder, fileName), FileMode.Create);
             await file.CopyToAsync(stream);
             return fileName;
@@ -110,11 +112,11 @@ namespace CHITSCHEME.Controllers.ECatalog
                         return Conflict(new { message = "This barcode already exists.", Barcode = req.Barcode });
                 }
 
-                // 2. Save images (null → stored as NULL in DB)
-                string? img1 = await SaveImageAsync(image1, req.ItemCode, 1);
-                string? img2 = await SaveImageAsync(image2, req.ItemCode, 2);
-                string? img3 = await SaveImageAsync(image3, req.ItemCode, 3);
-                string? img4 = await SaveImageAsync(image4, req.ItemCode, 4);
+                // 2. Save images → {Voucher}_{slot}.{ext}
+                string? img1 = await SaveImageAsync(image1, req.RefNo, 1);
+                string? img2 = await SaveImageAsync(image2, req.RefNo, 2);
+                string? img3 = await SaveImageAsync(image3, req.RefNo, 3);
+                string? img4 = await SaveImageAsync(image4, req.RefNo, 4);
 
                 // 3. Server-side lookups
                 string fCompCode = await GetCompCodeAsync();
@@ -236,11 +238,11 @@ INSERT INTO ItemPurchaseOP (
 
             try
             {
-                // New upload wins; fallback to existing filename sent in Image1-4
-                string img1 = (await SaveImageAsync(image1, req.ItemCode ?? "", 1)) ?? req.Image1 ?? "";
-                string img2 = (await SaveImageAsync(image2, req.ItemCode ?? "", 2)) ?? req.Image2 ?? "";
-                string img3 = (await SaveImageAsync(image3, req.ItemCode ?? "", 3)) ?? req.Image3 ?? "";
-                string img4 = (await SaveImageAsync(image4, req.ItemCode ?? "", 4)) ?? req.Image4 ?? "";
+                // New upload wins → {Voucher}_{slot}.{ext}; fallback to existing filename
+                string img1 = (await SaveImageAsync(image1, req.RefNo ?? "", 1)) ?? req.Image1 ?? "";
+                string img2 = (await SaveImageAsync(image2, req.RefNo ?? "", 2)) ?? req.Image2 ?? "";
+                string img3 = (await SaveImageAsync(image3, req.RefNo ?? "", 3)) ?? req.Image3 ?? "";
+                string img4 = (await SaveImageAsync(image4, req.RefNo ?? "", 4)) ?? req.Image4 ?? "";
 
                 // fRefNo from voucher
                 string fRefNo = (req.RefNo?.Length ?? 0) >= 8 ? req.RefNo!.Substring(2, 6) : req.RefNo ?? "";
