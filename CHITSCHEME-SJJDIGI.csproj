@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Controllers\SchemeUp\" />
     <Folder Include="ref\" />
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
