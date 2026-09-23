@@ -404,6 +404,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                     op.fOthers,
                     op.McAmount,
                     op.fid,
+                    op.fDescription,
                     COALESCE(op.FImage1, op.FImage2, op.FImage3, op.FImage4) AS fimage,
                     op.FImage1,
                     op.FImage2,
@@ -489,7 +490,8 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     fimage4 = reader["FImage4"]?.ToString(),
                                     IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
                                     fID = reader["fid"]?.ToString(),
-                                    DiavisionName = reader["fName"]?.ToString()
+                                    DiavisionName = reader["fName"]?.ToString(),
+                                    fDescription = reader["fDescription"]?.ToString(),
                                 });
                             }
                         }
