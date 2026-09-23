@@ -491,7 +491,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                                     IsWishlist = reader["IsWishlist"]?.ToString() ?? "N",
                                     fID = reader["fid"]?.ToString(),
                                     DiavisionName = reader["fName"]?.ToString(),
-                                    fDescription = reader["fDescription"]?.ToString(),
+                                    fdescription = reader["fDescription"]?.ToString(),
                                 });
                             }
                         }
