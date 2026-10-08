@@ -1035,7 +1035,7 @@ ORDER BY FACNAME;
                     cmd.Parameters.AddWithValue("@FSMSCHIT", "N");
                     cmd.Parameters.AddWithValue("@FINT", "0");
 
-                    cmd.Parameters.AddWithValue("@FRATE", item.Amount);
+                    cmd.Parameters.AddWithValue("@FRATE", item.FGRATE ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@FCARD", "0");
                     cmd.Parameters.AddWithValue("@FUPI", item.Amount);
                     cmd.Parameters.AddWithValue("@FNEFT", "0");
