@@ -282,8 +282,7 @@ namespace CHITSCHEME.Controllers
             public string FRate { get; set; }
         }
 
-
-        [HttpGet("schemeList")]
+[HttpGet("schemeList")]
         public async Task<IActionResult> GetSchemeDetails([FromHeader] string authorization)
         {
             if (string.IsNullOrEmpty(authorization) || !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
@@ -360,6 +359,8 @@ WITH RankedSchemes AS
 
         -- Current Month Paid (ONLINE + OFFLINE)
        CASE
+   WHEN ISNULL(L.MaxDue, 0) >= P.FDUE THEN
+        'Y'
     -- 330 Days Scheme -> Check Today's Payment
     WHEN PARENT.fCode = '03026' THEN
         CASE
@@ -459,7 +460,7 @@ ORDER BY FACNAME;
                 decimal rate22K = 0;
                 decimal rate24K = 0;
 
-                var rateQuery = "SELECT FRATE FROM Division WHERE FCODE = '0002'";
+                var rateQuery = "SELECT FRATE FROM Division WHERE FCODE = '0001'";
                 using (var rateCmd = new SqlCommand(rateQuery, connection))
                 {
                     var result = await rateCmd.ExecuteScalarAsync();
@@ -469,7 +470,7 @@ ORDER BY FACNAME;
                     }
                 }
 
-                var rateQuery24k = "SELECT FRATE FROM Division WHERE FCODE = '0003'";
+                var rateQuery24k = "SELECT FRATE FROM Division WHERE FCODE = '0002'";
                 using (var rateCmd = new SqlCommand(rateQuery24k, connection))
                 {
                     var result = await rateCmd.ExecuteScalarAsync();
@@ -516,17 +517,17 @@ ORDER BY FACNAME;
 
                     decimal weightch = 0;
                     var fdigicr = reader["FDIGICR"]?.ToString();
-                    if (schemeType == "W" && reader["FDIGITYPE"]?.ToString() == "WT")
+                    if ( reader["FDIGITYPE"]?.ToString() == "WT" )
                     {
-                        if (fdigicr == "22K" && rate22K != 0)
+                        if(fdigicr == "22K" && rate22K != 0)
                         {
                             weight = amount / rate22K;
                         }
-                        else if (fdigicr == "24K" && rate24K != 0)
+                        else if(fdigicr == "24K" && rate24K != 0)
                         {
                             weight = amount / rate24K;
                         }
-
+                      
                     }
                     DateTime? joinDate = reader["FDATE"] != DBNull.Value
                     ? Convert.ToDateTime(reader["FDATE"])
@@ -545,6 +546,7 @@ ORDER BY FACNAME;
                     var scheme = new
                     {
                         fcode = reader["FCODE"]?.ToString(),
+                        fname= reader["FACNAME"]?.ToString(),
                         schemename = reader["SCHEMENAME"]?.ToString(),
                         famount = reader["FAMOUNT"]?.ToString(),
                         schemecode = reader["SCHEMECODE"]?.ToString(),
@@ -553,9 +555,9 @@ ORDER BY FACNAME;
                         fdue_comparison = reader["FDUE_Comparison"]?.ToString(),
                         iS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]?.ToString(),
                         fdigicr = reader["FDIGICR"]?.ToString(),
-                        FSCHEMETYPE = reader["FSCHEMETYPE"] == DBNull.Value || string.IsNullOrWhiteSpace(reader["FSCHEMETYPE"].ToString()) ? "R" : reader["FSCHEMETYPE"].ToString(),
+                        FSCHEMETYPE = reader["FDIGITYPE"]?.ToString(),
                         fcompcode = reader["FCOMPCODE"]?.ToString(),
-                        weight = weight > 0 ? weight.ToString("0.000") : null,
+                        weight = weight > 0 ? weight.ToString("0.000") : null,                         
                         joinDate = joinDate?.ToString("dd/MM/yyyy") ?? "",
                         maturityDate = maturityDate?.ToString("dd/MM/yyyy") ?? "",
                         maturityStatus = maturityStatus,
@@ -697,10 +699,12 @@ ORDER BY FACNAME;
 
 
 
+      
         [HttpGet("SchemeReport/{SchemeId}")]
         public async Task<IActionResult> GetLedgerDetails(string SchemeId)
         {
             var ledgerDetails = new List<LedgerDetails>();
+
             decimal ledgerDue = 0;
             decimal partyTotalDue = 0;
 
@@ -710,20 +714,83 @@ ORDER BY FACNAME;
                 {
                     await connection.OpenAsync();
 
-                    var ledgerQuery = @"
-                
+                    // =========================================================
+                    // 1. LEDGER DETAILS + PAYMENT MODE
+                    // =========================================================
 
-            SELECT 
-                FORMAT(CAST(L.FDATE AS DATE), 'dd/MM/yyyy') AS FDATE,
-                L.FVRAMOUNT,
-                B.FWT
-            FROM LEDGER L
-            JOIN PARTY P ON P.FID = L.FID
-            JOIN BLEDGER B ON B.FVOUCHNO = L.FVRNO 
-            WHERE 
-                L.FID = @FID 
-                AND L.FCRDB = 'CR' 
-                AND L.FTYPE = 'CT';
+                    var ledgerQuery = @"
+               SELECT  
+    FORMAT(CAST(L.FDATE AS DATE), 'dd/MM/yyyy') AS FDATE,
+    L.FVRAMOUNT,
+    B.FWT,
+
+    -- ONLINE / OFFLINE
+       -- ONLINE / OFFLINE
+    CASE 
+        WHEN NULLIF(LTRIM(RTRIM(B.FRazorpayPaymentId)), '') IS NOT NULL
+            THEN 'Online'
+        ELSE 'Offline'
+    END AS PaymentType,
+
+    -- PAYMENT MODE
+    CASE 
+
+        -- ONLINE PAYMENT
+       WHEN NULLIF(LTRIM(RTRIM(B.FRazorpayPaymentId)), '') IS NOT NULL
+            THEN 'UPI'
+
+        -- OFFLINE PAYMENT
+        ELSE
+            STUFF(
+                CASE 
+                    WHEN ISNULL(B.FCASH, 0) > 0 
+                        THEN ', Cash' 
+                    ELSE '' 
+                END +
+
+                CASE 
+                    WHEN ISNULL(B.FCARD, 0) > 0 
+                        THEN ', Card' 
+                    ELSE '' 
+                END +
+
+                CASE 
+                    WHEN ISNULL(B.FUPI, 0) > 0 
+                        THEN ', UPI' 
+                    ELSE '' 
+                END +
+
+                CASE 
+                    WHEN ISNULL(B.FNEFT, 0) > 0 
+                        THEN ', NEFT' 
+                    ELSE '' 
+                END,
+
+                1,
+                2,
+                ''
+            )
+    END AS PaymentMode
+
+FROM LEDGER L
+
+INNER JOIN PARTY P 
+    ON P.FID = L.FID
+
+INNER JOIN BLEDGER B 
+    ON B.FVOUCHNO = L.FVRNO
+
+
+LEFT JOIN PaymentRecords OPR
+    ON OPR.RazorpayOrderId = B.FRazorpayPaymentId
+WHERE 
+    L.FID = @FID
+    AND L.FCRDB = 'CR'
+    AND L.FTYPE = 'CT'
+
+ORDER BY L.FDATE;
+
+
 
             ";
 
@@ -737,9 +804,25 @@ ORDER BY FACNAME;
                             {
                                 var details = new LedgerDetails
                                 {
-                                    FDATE = reader["FDATE"].ToString(),
-                                    FVRAMOUNT = reader["FVRAMOUNT"].ToString(),
-                                    FWT = reader["FWT"].ToString()
+                                    FDATE = reader["FDATE"] != DBNull.Value
+                                        ? reader["FDATE"].ToString()
+                                        : "",
+
+                                    FVRAMOUNT = reader["FVRAMOUNT"] != DBNull.Value
+                                        ? reader["FVRAMOUNT"].ToString()
+                                        : "0",
+
+                                    FWT = reader["FWT"] != DBNull.Value
+                                        ? reader["FWT"].ToString()
+                                        : "0",
+
+                                    PaymentType = reader["PaymentType"] != DBNull.Value
+                                        ? reader["PaymentType"].ToString()
+                                        : "",
+
+                                    PaymentMode = reader["PaymentMode"] != DBNull.Value
+                                        ? reader["PaymentMode"].ToString()
+                                        : ""
                                 };
 
                                 ledgerDetails.Add(details);
@@ -747,24 +830,32 @@ ORDER BY FACNAME;
                         }
                     }
 
-                    // 2. Fetch Latest Due Information
+
+                    // =========================================================
+                    // 2. FETCH LATEST DUE INFORMATION
+                    // =========================================================
+
                     var dueQuery = @"
-                
-
-
-               
-                   SELECT TOP 1
-                     ISNULL(L.FDUE, 0) AS FDUE,  
-                    P.FDUE AS PartyFDUE, 
+                SELECT TOP 1 
+                    ISNULL(L.FDUE, 0) AS FDUE,
+                    ISNULL(P.FDUE, 0) AS PartyFDUE,
                     L.FVRNO
+
                 FROM PARTY P
-                LEFT JOIN LEDGER L 
-                    ON L.FID = P.FID AND L.FCRDB = 'CR'
-                LEFT JOIN BLEDGER B 
-                    ON B.FVOUCHNO = L.FVRNO AND B.FONLINE = 'Y'
-                WHERE P.FID =  @FID
-                ORDER BY L.FDUE DESC
-                    ";
+
+                LEFT JOIN LEDGER L  
+                    ON L.FID = P.FID 
+                    AND L.FCRDB = 'CR'
+
+                LEFT JOIN BLEDGER B  
+                    ON B.FVOUCHNO = L.FVRNO 
+                    AND B.FONLINE = 'Y'
+
+                WHERE 
+                    P.FID = @FID
+
+                ORDER BY L.FDUE DESC;
+            ";
 
                     using (var dueCommand = new SqlCommand(dueQuery, connection))
                     {
@@ -774,14 +865,23 @@ ORDER BY FACNAME;
                         {
                             if (await dueReader.ReadAsync())
                             {
-                                ledgerDue = dueReader["FDUE"] != DBNull.Value ? Convert.ToDecimal(dueReader["FDUE"]) : 0;
-                                partyTotalDue = dueReader["PartyFDUE"] != DBNull.Value ? Convert.ToDecimal(dueReader["PartyFDUE"]) : 0;
+                                ledgerDue = dueReader["FDUE"] != DBNull.Value
+                                    ? Convert.ToDecimal(dueReader["FDUE"])
+                                    : 0;
+
+                                partyTotalDue = dueReader["PartyFDUE"] != DBNull.Value
+                                    ? Convert.ToDecimal(dueReader["PartyFDUE"])
+                                    : 0;
                             }
                         }
                     }
                 }
 
-                // 3. Return combined result
+
+                // =========================================================
+                // 3. RETURN RESPONSE
+                // =========================================================
+
                 return Ok(new
                 {
                     LedgerDetails = ledgerDetails,
@@ -791,13 +891,26 @@ ORDER BY FACNAME;
             }
             catch (SqlException sqlEx)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Database error. Please try again later." });
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new
+                    {
+                        message = "Database error. Please try again later."
+                    }
+                );
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unexpected error occurred. Please try again later." });
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new
+                    {
+                        message = "An unexpected error occurred. Please try again later."
+                    }
+                );
             }
         }
+
 
 
 
@@ -1135,7 +1248,7 @@ ORDER BY FACNAME;
 
         [HttpGet("DigiList")]
         public IActionResult GetSchemes(
-       [FromQuery] string parentCode = "000010004400068", // default value
+       [FromQuery] string parentCode = "000010004400051", // default value
        [FromQuery] int pageNumber = 1,
        [FromQuery] int pageSize = 10,
        [FromQuery] string searchTerm = "")
@@ -1260,21 +1373,24 @@ FETCH NEXT @PageSize ROWS ONLY;
 
         [HttpGet("PlanList")]
         public IActionResult GetPlanList(
-          [FromQuery] int pageNumber = 1,
-          [FromQuery] int pageSize = 10,
-          [FromQuery] string searchTerm = "")
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string searchTerm = "")
         {
             try
             {
                 var plans = new List<object>();
+
+                int offset = (pageNumber - 1) * pageSize;
 
                 using (SqlConnection conn = new SqlConnection(DBHelper.GetConnection()))
                 {
                     conn.Open();
 
                     string sqlQuery = @"
-WITH RankedSchemes AS (
-    SELECT 
+WITH RankedSchemes AS
+(
+    SELECT
         P.FCODE,
         P.FACNAME,
         P.FPHONE,
@@ -1285,65 +1401,161 @@ WITH RankedSchemes AS (
         P.FDIGITYPE,
         P.FID AS SCHEMECODE,
         P.FSCHEMETYPE,
-        CASE WHEN L.FDUE IS NOT NULL THEN L.FDUE + 0 ELSE 0 END AS PaidDue,
-        IIF(L.FDUE IS NULL, 'N', IIF(P.FDUE = L.FDUE, 'Y', 'N')) AS FDUE_Comparison,
+
+        CASE
+            WHEN L.FDUE IS NOT NULL THEN L.FDUE
+            ELSE 0
+        END AS PaidDue,
+
+        IIF(
+            L.FDUE IS NULL,
+            'N',
+            IIF(P.FDUE = L.FDUE, 'Y', 'N')
+        ) AS FDUE_Comparison,
+
         PARENT.FACNAME AS SCHEMENAME,
         PARENT.FPARENT AS PARE,
-        ROW_NUMBER() OVER (PARTITION BY P.FID ORDER BY ISNULL(L.FDUE, 0) DESC) AS rn,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 
-            FROM LEDGER L3
-            JOIN BLEDGER B3 ON B3.FVOUCHNO = L3.FVRNO AND B3.FONLINE = 'Y'
-            WHERE 
-              L3.FID = P.FID 
-               AND L3.FDATE BETWEEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1) AND EOMONTH(GETDATE())
-              AND L3.fCrDb = 'CR' 
-              AND L3.FTYPE = 'CT'
-          ) THEN 'Y'
-          ELSE 'N'
-        END AS IS_CURRENT_MONTH_PAID
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY P.FID
+            ORDER BY ISNULL(L.FDUE, 0) DESC
+        ) AS rn,
+
+        CASE
+            WHEN EXISTS
+            (
+                SELECT 1
+                FROM LEDGER L3
+                INNER JOIN BLEDGER B3
+                    ON B3.FVOUCHNO = L3.FVRNO
+                    AND B3.FONLINE = 'Y'
+                WHERE
+                    L3.FID = P.FID
+                    AND L3.FDATE >= DATEFROMPARTS(
+                        YEAR(GETDATE()),
+                        MONTH(GETDATE()),
+                        1
+                    )
+                    AND L3.FDATE < DATEADD(
+                        DAY,
+                        1,
+                        EOMONTH(GETDATE())
+                    )
+                    AND L3.fCrDb = 'CR'
+                    AND L3.FTYPE = 'CT'
+            )
+            THEN 'Y'
+            ELSE 'N'
+        END AS IS_CURRENT_MONTH_PAID,
+
+        R.PhoneNumber AS REGISTERED_PHONE
+
     FROM PARTY P
-    LEFT JOIN (
-        SELECT 
+
+    -- Only users having matching phone number
+    INNER JOIN RegisterUsers R
+        ON LTRIM(RTRIM(R.PhoneNumber)) =
+           LTRIM(RTRIM(P.FPHONE))
+
+    LEFT JOIN
+    (
+        SELECT
             L1.FID,
             L1.FVRNO,
             L1.FDUE,
             L1.FVRAMOUNT
         FROM LEDGER L1
-        INNER JOIN (
-            SELECT FID, MAX(FVRNO) AS MaxFVRNO
+
+        INNER JOIN
+        (
+            SELECT
+                L2.FID,
+                MAX(L2.FVRNO) AS MaxFVRNO
             FROM LEDGER L2
-            JOIN BLEDGER B2 ON B2.FVOUCHNO = L2.FVRNO
-            WHERE L2.fCrDb = 'CR' AND L2.FTYPE = 'CT' AND B2.FONLINE = 'Y'
+            INNER JOIN BLEDGER B2
+                ON B2.FVOUCHNO = L2.FVRNO
+            WHERE
+                L2.fCrDb = 'CR'
+                AND L2.FTYPE = 'CT'
+                AND B2.FONLINE = 'Y'
             GROUP BY L2.FID
-        ) AS MaxRows ON L1.FID = MaxRows.FID AND L1.FVRNO = MaxRows.MaxFVRNO
-        JOIN BLEDGER B1 ON B1.FVOUCHNO = L1.FVRNO AND B1.FONLINE = 'Y'
-        WHERE L1.fCrDb = 'CR' AND L1.FTYPE = 'CT'
-    ) L ON P.FID = L.FID
-    LEFT JOIN PARTY PARENT ON PARENT.FPARENT = LEFT(P.FPARENT, LEN(P.FPARENT) - 5)
-   WHERE P.FPARENT NOT  LIKE '000010004400068%' AND P.FPARENT NOT  LIKE  '000010004400069%' 
+        ) AS MaxRows
+            ON L1.FID = MaxRows.FID
+            AND L1.FVRNO = MaxRows.MaxFVRNO
+
+        INNER JOIN BLEDGER B1
+            ON B1.FVOUCHNO = L1.FVRNO
+            AND B1.FONLINE = 'Y'
+
+        WHERE
+            L1.fCrDb = 'CR'
+            AND L1.FTYPE = 'CT'
+    ) L
+        ON P.FID = L.FID
+
+    LEFT JOIN PARTY PARENT
+        ON PARENT.FPARENT =
+           LEFT(
+                P.FPARENT,
+                LEN(P.FPARENT) - 5
+           )
+
+    WHERE
+        P.FPARENT LIKE '0000100044%'
+        AND P.FAclevel < 0
+
+        -- Exclude Digi Gold and Digi Silver
+        AND P.FPARENT NOT LIKE '000010004400051%'
+        AND P.FPARENT NOT LIKE '000010004400052%'
+
+        -- Exclude these FCODEs
+        AND P.FCODE NOT IN
+        (
+            '00050',
+            '00051',
+            '00052','00044'
+        )
 )
+
 SELECT *
 FROM RankedSchemes
-WHERE rn = 1
-AND (FACNAME LIKE @Search OR SCHEMENAME LIKE @Search)
+WHERE
+    rn = 1
+    AND
+    (
+        FACNAME LIKE @Search
+        OR SCHEMENAME LIKE @Search
+        OR FPHONE LIKE @Search
+    )
 ORDER BY FACNAME
+
 OFFSET @Offset ROWS
 FETCH NEXT @PageSize ROWS ONLY;
 ";
 
                     using (SqlCommand cmd = new SqlCommand(sqlQuery, conn))
                     {
-                        cmd.Parameters.AddWithValue("@Search", $"%{searchTerm}%");
-                        cmd.Parameters.AddWithValue("@Offset", (pageNumber - 1) * pageSize);
-                        cmd.Parameters.AddWithValue("@PageSize", pageSize);
+                        cmd.Parameters.AddWithValue(
+                            "@Search",
+                            $"%{searchTerm}%"
+                        );
+
+                        cmd.Parameters.AddWithValue(
+                            "@Offset",
+                            offset
+                        );
+
+                        cmd.Parameters.AddWithValue(
+                            "@PageSize",
+                            pageSize
+                        );
 
                         using (SqlDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                var plan = new
+                                plans.Add(new
                                 {
                                     FCODE = reader["FCODE"],
                                     FACNAME = reader["FACNAME"],
@@ -1359,9 +1571,9 @@ FETCH NEXT @PageSize ROWS ONLY;
                                     FDUE_Comparison = reader["FDUE_Comparison"],
                                     SCHEMENAME = reader["SCHEMENAME"],
                                     PARE = reader["PARE"],
-                                    IS_CURRENT_MONTH_PAID = reader["IS_CURRENT_MONTH_PAID"]
-                                };
-                                plans.Add(plan);
+                                    IS_CURRENT_MONTH_PAID =
+                                        reader["IS_CURRENT_MONTH_PAID"]
+                                });
                             }
                         }
                     }
@@ -1376,9 +1588,17 @@ FETCH NEXT @PageSize ROWS ONLY;
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = ex.Message });
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        status = false,
+                        message = ex.Message
+                    }
+                );
             }
         }
+
 
 
 
@@ -1534,4 +1754,6 @@ public class LedgerDetails
     public string FDATE { get; set; }
     public string FVRAMOUNT { get; set; }
     public string FWT { get; set; }
+    public string PaymentType { get; set; }
+    public string PaymentMode { get; set; }
 }
