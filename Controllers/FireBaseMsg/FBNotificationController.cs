@@ -25,7 +25,7 @@ namespace CHITSCHEME.Controllers.FireBaseMsg
                 if (_firebaseInitialized) return;
 
                 var jsonPath = Path.Combine(AppContext.BaseDirectory,
-                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-0bd7c272ff.json");
+                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-d4f16f6c33.json");
 
                 if (FirebaseApp.DefaultInstance == null)
                 {
