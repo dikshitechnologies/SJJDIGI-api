@@ -25,7 +25,7 @@ namespace CHITSCHEME.Controllers.Jewellery
                 if (_firebaseInitialized) return;
 
                 var jsonPath = Path.Combine(AppContext.BaseDirectory,
-                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-d4f16f6c33.json");
+                    "sri-jain-walajapet-firebase-adminsdk-fbsvc-656f56a0e7.json");
 
                 // Only create if no default app exists yet
                 if (FirebaseApp.DefaultInstance == null)
